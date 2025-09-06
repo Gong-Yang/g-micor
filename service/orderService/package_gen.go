@@ -16,6 +16,6 @@ func (n orderLocalClient) Create(ctx context.Context, in *order.CreateReq, opts 
 
 func (n Service) Init(s grpc.ServiceRegistrar) string {
 	order.Client = orderLocalClient{server: n} // 本地直接调
-	order.RegisterOrderServer(s, n)            // 将服务注册
+	order.RegisterOrderServer(s, &n)           // 将服务注册
 	return "order"                             // 服务名称
 }

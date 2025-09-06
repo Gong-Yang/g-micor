@@ -10,7 +10,7 @@ type Service struct {
 	notify.UnimplementedNotifyServer
 }
 
-func (n Service) SendEmail(ctx context.Context, req *notify.SendEmailRequest) (*notify.SendEmailResponse, error) {
+func (n *Service) SendEmail(ctx context.Context, req *notify.SendEmailRequest) (*notify.SendEmailResponse, error) {
 	slog.Info("send email", "req", req)
 	return &notify.SendEmailResponse{
 		Code:    201,

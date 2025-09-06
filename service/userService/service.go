@@ -11,7 +11,7 @@ type Service struct {
 	user.UnimplementedUserServer
 }
 
-func (s Service) Register(ctx context.Context, req *user.RegisterReq) (*user.RegisterRes, error) {
+func (s *Service) Register(ctx context.Context, req *user.RegisterReq) (*user.RegisterRes, error) {
 	slog.Info("register user", "req", req)
 
 	response, err := notify.Client.SendEmail(ctx, &notify.SendEmailRequest{

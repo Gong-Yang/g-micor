@@ -17,10 +17,10 @@ g-micor/
 │   └── xxxApp/                 # 用户应用
 │       └── main.go             # 用户服务启动入口
 ├── contract/                   # 接口契约层
-│   ├── notify_contract/        # 通知服务契约
+│   ├── notify/        # 通知服务契约
 │   │   ├── contract_gen.go     # 自动生成的契约代码
 │   │   └── model.go            # 数据模型定义
-│   └── xxx_contract/           # 用户服务契约
+│   └── xxx/           # 用户服务契约
 │       ├── contract_gen.go     # 自动生成的契约代码
 │       └── model.go            # 数据模型定义
 ├── core/                       # 核心基础设施
@@ -30,8 +30,6 @@ g-micor/
 │   │   ├── client.go           # 服务发现客户端
 │   │   ├── model.go            # 服务发现数据模型
 │   │   └── server.go           # 服务发现服务端
-│   ├── rpcx/                   # RPC通信框架
-│   │   └── client.go           # RPC客户端
 │   └── syncx/                  # 并发控制工具
 ├── service/                    # 业务服务层
 │   ├── notify/                 # 通知模块
@@ -55,11 +53,14 @@ g-micor/
 
 # 开发步骤
 1. 如果是全新应用 新建application, `app.Run("端口号", 服务发现地址,   服务模块.Service{})`
-2. 新简模块 放于service目录下
-3. 模块中直接编写方法，将需要暴露出去的方法，添加 // export 注释 ， 运行`service/gen.go` 生成服务对象和契约对象
-4. 暴露方法规范： 
-   1. 入参只有一个， 响应有结果和错误
-   2. 入参和结果的结构体必须定义在契约目录下
+2. 新建模块 先到契约层中定义接口和数据模型，业务代码放于service目录下，
+3. 新建一个Service的结构体，结构体的方法会被自动暴露出去 ，
+4. 运行`service/gen.go` 生成服务对象和契约对象
+5. Service方法规范： 
+   1. 入参只有ctx和请求体两个参数， 响应有结果和错误
 
+# 命令备份
 
-protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative contract/notify/notify.proto
+proto：
+`protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative contract/user/user.proto`
+

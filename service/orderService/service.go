@@ -11,7 +11,7 @@ type Service struct {
 	order.UnimplementedOrderServer
 }
 
-func (s Service) Create(ctx context.Context, req *order.CreateReq) (*order.CreateRes, error) {
+func (s *Service) Create(ctx context.Context, req *order.CreateReq) (*order.CreateRes, error) {
 	slog.Info("order create", "req", req)
 	email, err := notify.Client.SendEmail(ctx, &notify.SendEmailRequest{
 		Subject: "订单创建成功",

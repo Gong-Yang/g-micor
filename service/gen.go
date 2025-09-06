@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"log"
@@ -17,273 +18,330 @@ import (
 
 // 生成package_gen.go、contract_gen.go
 const (
-	service = "notify" //需要生成的service
+	service = "test" //需要生成的service
 
 	servicePath  = "./service/"
 	contractPath = "./contract/"
 )
 
-// FuncInfo 存储函数信息
-type FuncInfo struct {
-	Name    string
-	ReqType string
-	ResType string
-	Doc     string
+// 方法信息
+type MethodInfo struct {
+	Name       string
+	ParamType  string
+	ReturnType string
 }
 
 func main() {
 	slog.Info("Starting code generation", "service", service)
 
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, servicePath+service, nil, parser.ParseComments)
+	pkgs, err := parser.ParseDir(fset, servicePath+service+"Service", nil, parser.ParseComments)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	slog.Info("Parsed packages", "count", len(pkgs))
-
-	// 收集所有带有 // export 的函数
-	var exportedFuncs []FuncInfo
-	for _, pkg := range pkgs {
-		slog.Info("Processing package", "name", pkg.Name)
-		for _, file := range pkg.Files {
-			for _, decl := range file.Decls {
-				if fn, ok := decl.(*ast.FuncDecl); ok {
-					if fn.Doc != nil {
-						for _, comment := range fn.Doc.List {
-							if strings.Contains(comment.Text, "// export") {
-								slog.Info("Found exported function", "name", fn.Name.Name)
-								funcInfo := extractFuncInfo(fn)
-								if funcInfo != nil {
-									exportedFuncs = append(exportedFuncs, *funcInfo)
-								}
-								break
-							}
-						}
-					}
-				}
-			}
-		}
+	// 扫描并收集方法信息
+	methods, err := scanServiceMethods(pkgs, fset)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	if len(exportedFuncs) == 0 {
-		slog.Info("No exported functions found")
+	if len(methods) == 0 {
+		slog.Info("No service methods found")
 		return
 	}
 
-	slog.Info("Found exported functions", "count", len(exportedFuncs))
+	slog.Info("Found service methods", "count", len(methods))
 
-	// 生成文件
-	generatePackageFile(exportedFuncs)
-	generateContractFile(exportedFuncs)
+	// 生成 contract_gen.go
+	err = generateContractFile(service, methods)
+	if err != nil {
+		log.Fatal("Failed to generate contract file:", err)
+	}
 
-	slog.Info("Code generation completed", "service", service, "functions", len(exportedFuncs))
+	// 生成 package_gen.go
+	err = generatePackageFile(service, methods)
+	if err != nil {
+		log.Fatal("Failed to generate package file:", err)
+	}
+
+	slog.Info("Code generation completed successfully", "service", service)
 }
 
-// extractFuncInfo 从AST函数声明中提取函数信息
-func extractFuncInfo(fn *ast.FuncDecl) *FuncInfo {
-	if fn.Type.Params == nil || len(fn.Type.Params.List) != 1 {
-		slog.Warn("Function must have exactly one parameter", "func", fn.Name.Name)
-		return nil
-	}
+// 扫描 Service 结构体的方法
+func scanServiceMethods(pkgs map[string]*ast.Package, fset *token.FileSet) ([]MethodInfo, error) {
+	var methods []MethodInfo
 
-	if fn.Type.Results == nil || len(fn.Type.Results.List) != 2 {
-		slog.Warn("Function must return exactly two values (res, err)", "func", fn.Name.Name)
-		return nil
-	}
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Files {
+			ast.Inspect(file, func(n ast.Node) bool {
+				switch x := n.(type) {
+				case *ast.FuncDecl:
+					// 检查是否是方法
+					if x.Recv != nil && len(x.Recv.List) > 0 {
+						// 获取接收者类型
+						recvType := getReceiverType(x.Recv.List[0])
 
-	// 提取请求类型
-	reqType := extractTypeString(fn.Type.Params.List[0].Type)
-	if reqType == "" {
-		slog.Warn("Cannot extract request type", "func", fn.Name.Name)
-		return nil
-	}
+						// 检查是否是 *Service 类型的方法
+						if recvType == "*Service" {
+							methodName := x.Name.Name
 
-	// 提取响应类型
-	resType := extractTypeString(fn.Type.Results.List[0].Type)
-	if resType == "" {
-		slog.Warn("Cannot extract response type", "func", fn.Name.Name)
-		return nil
-	}
+							// 跳过 Init 方法
+							if methodName == "Init" {
+								return true
+							}
 
-	// 提取文档注释
-	doc := ""
-	if fn.Doc != nil {
-		for _, comment := range fn.Doc.List {
-			if !strings.Contains(comment.Text, "// export") {
-				doc += strings.TrimPrefix(comment.Text, "//") + "\n"
-			}
+							// 验证方法签名
+							paramType, returnType, err := validateMethodSignature(x, fset)
+							if err != nil {
+								slog.Warn("Method signature validation failed", "method", methodName, "error", err)
+								return true
+							}
+
+							methods = append(methods, MethodInfo{
+								Name:       methodName,
+								ParamType:  paramType,
+								ReturnType: returnType,
+							})
+
+							slog.Info("Found service method", "method", methodName, "param", paramType, "return", returnType)
+						}
+					}
+				}
+				return true
+			})
 		}
-		doc = strings.TrimSpace(doc)
 	}
 
-	return &FuncInfo{
-		Name:    fn.Name.Name,
-		ReqType: reqType,
-		ResType: resType,
-		Doc:     doc,
-	}
+	return methods, nil
 }
 
-// extractTypeString 从AST类型表达式中提取类型字符串
-func extractTypeString(expr ast.Expr) string {
-	switch t := expr.(type) {
+// 获取接收者类型
+func getReceiverType(recv *ast.Field) string {
+	switch t := recv.Type.(type) {
 	case *ast.StarExpr:
-		// 指针类型
-		return "*" + extractTypeString(t.X)
-	case *ast.SelectorExpr:
-		// 包选择器，如 pkg.Type
 		if ident, ok := t.X.(*ast.Ident); ok {
-			return ident.Name + "." + t.Sel.Name
+			return "*" + ident.Name
 		}
 	case *ast.Ident:
-		// 简单标识符
 		return t.Name
 	}
 	return ""
 }
 
-// generatePackageFile 生成 package_gen.go 文件
-func generatePackageFile(funcs []FuncInfo) {
-	filePath := filepath.Join(servicePath, service, "package_gen.go")
+// 验证方法签名
+func validateMethodSignature(fn *ast.FuncDecl, fset *token.FileSet) (string, string, error) {
+	// 检查参数：应该有 context.Context 和一个请求参数
+	if fn.Type.Params == nil || len(fn.Type.Params.List) != 2 {
+		return "", "", fmt.Errorf("method must have exactly 2 parameters (context.Context and request)")
+	}
 
-	tmpl := `package {{.Service}}
+	// 第一个参数应该是 context.Context
+	firstParam := fn.Type.Params.List[0]
+	firstParamType := getTypeString(firstParam.Type)
+	if firstParamType != "context.Context" {
+		return "", "", fmt.Errorf("first parameter must be context.Context, got %s", firstParamType)
+	}
+
+	// 第二个参数应该是指针类型
+	secondParam := fn.Type.Params.List[1]
+	paramType := getTypeString(secondParam.Type)
+	if !strings.HasPrefix(paramType, "*") {
+		return "", "", fmt.Errorf("second parameter must be a pointer type, got %s", paramType)
+	}
+
+	// 检查返回值：应该有两个返回值
+	if fn.Type.Results == nil || len(fn.Type.Results.List) != 2 {
+		return "", "", fmt.Errorf("method must have exactly 2 return values")
+	}
+
+	// 第一个返回值应该是指针类型
+	firstReturn := fn.Type.Results.List[0]
+	returnType := getTypeString(firstReturn.Type)
+	if !strings.HasPrefix(returnType, "*") {
+		return "", "", fmt.Errorf("first return value must be a pointer type, got %s", returnType)
+	}
+
+	// 第二个返回值应该是 error
+	secondReturn := fn.Type.Results.List[1]
+	errorType := getTypeString(secondReturn.Type)
+	if errorType != "error" {
+		return "", "", fmt.Errorf("second return value must be error, got %s", errorType)
+	}
+
+	return paramType, returnType, nil
+}
+
+// 获取类型字符串
+func getTypeString(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.StarExpr:
+		return "*" + getTypeString(t.X)
+	case *ast.SelectorExpr:
+		if x, ok := t.X.(*ast.Ident); ok {
+			return x.Name + "." + t.Sel.Name
+		}
+	}
+	return ""
+}
+
+// 生成 contract_gen.go 文件
+func generateContractFile(serviceName string, methods []MethodInfo) error {
+	const contractTemplate = `package {{.ServiceName}}
 
 import (
-	"github.com/Gong-Yang/g-micor/contract/{{.Service}}_contract"
-)
-
-func init() {
-{{- range .Funcs}}
-	{{$.Service}}_contract.{{.Name}}I = {{.Name}}
-{{- end}}
-}
-
-type Service struct {
-}
-
-{{range .Funcs}}
-func (s Service) {{.Name}}(req {{.ReqType}}, res {{.ResType}}) (err error) {
-	res_, err := {{.Name}}(req)
-	if err != nil {
-		return err
-	}
-	*res = *res_
-	return
-}
-
-{{end}}`
-
-	data := struct {
-		Service string
-		Funcs   []FuncInfo
-	}{
-		Service: service,
-		Funcs:   funcs,
-	}
-
-	if err := executeTemplate(tmpl, data, filePath); err != nil {
-		log.Fatalf("Failed to generate package file: %v", err)
-	}
-
-	slog.Info("Generated package file", "path", filePath)
-}
-
-// generateContractFile 生成 contract_gen.go 文件
-func generateContractFile(funcs []FuncInfo) {
-	filePath := filepath.Join(contractPath, service+"_contract", "contract_gen.go")
-
-	tmpl := `package {{.Service}}_contract
-
-import (
+	"context"
 	"github.com/Gong-Yang/g-micor/core/discover"
+	"google.golang.org/grpc"
 	"log/slog"
 )
 
-{{range .Funcs}}
-var {{.Name}}I func(req {{trimPkg .ReqType}}) (res {{trimPkg .ResType}}, err error)
+var Client {{.ServiceName | title}}Client = &{{.ServiceName}}RemoteClient{}
 
-{{end}}
-{{range .Funcs}}
-{{if .Doc}}// {{.Doc}}{{end}}
-func {{.Name}}(req {{trimPkg .ReqType}}) (res {{trimPkg .ResType}}, err error) {
-	if {{.Name}}I != nil {
-		return {{.Name}}I(req)
-	}
-	client, err := discover.Discover("{{$.Service}}")
-	if err != nil {
-		slog.Info("{{$.Service}} discover error", "err", err)
-		return
-	}
-	res = new({{sp .ResType}})
-	err = client.Call("{{$.Service}}.{{.Name}}", req, res)
-	if err != nil { 
-		return
-	}
-	return
+type {{.ServiceName}}RemoteClient struct {
+	client {{.ServiceName | title}}Client
 }
 
-{{end}}`
+func (n *{{.ServiceName}}RemoteClient) init() error {
+	c, err := discover.Grpc("{{.ServiceName}}")
+	if err != nil {
+		return err
+	}
+	client := New{{.ServiceName | title}}Client(c)
+	n.client = client
+	slog.Info("{{.ServiceName}} remote client init")
+	return nil
+}
+{{range .Methods}}
+func (n *{{$.ServiceName}}RemoteClient) {{.Name}}(ctx context.Context, in {{.ParamType}}, opts ...grpc.CallOption) ({{.ReturnType}}, error) {
+	if n.client == nil {
+		err := n.init()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return n.client.{{.Name}}(ctx, in, opts...)
+}
+{{end}}
+`
 
-	// 创建模板函数
 	funcMap := template.FuncMap{
-		"trimPkg": func(s string) string {
-			return "*" + strings.Split(s, ".")[1]
-		},
-		"sp": func(s string) string {
-			return strings.Split(s, ".")[1]
-		},
+		"title": strings.Title,
+	}
+
+	tmpl, err := template.New("contract").Funcs(funcMap).Parse(contractTemplate)
+	if err != nil {
+		return err
 	}
 
 	data := struct {
-		Service string
-		Funcs   []FuncInfo
+		ServiceName string
+		Methods     []MethodInfo
 	}{
-		Service: service,
-		Funcs:   funcs,
+		ServiceName: serviceName,
+		Methods:     methods,
 	}
 
-	if err := executeTemplateWithFuncs(tmpl, funcMap, data, filePath); err != nil {
-		log.Fatalf("Failed to generate contract file: %v", err)
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, data)
+	if err != nil {
+		return err
+	}
+
+	// 格式化代码
+	formatted, err := format.Source(buf.Bytes())
+	if err != nil {
+		return err
+	}
+
+	// 确保目录存在
+	contractDir := filepath.Join(contractPath, serviceName)
+	err = os.MkdirAll(contractDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	// 写入文件
+	filePath := filepath.Join(contractDir, "contract_gen.go")
+	err = os.WriteFile(filePath, formatted, 0644)
+	if err != nil {
+		return err
 	}
 
 	slog.Info("Generated contract file", "path", filePath)
-}
-
-// executeTemplate 执行模板并写入文件
-func executeTemplate(tmplStr string, data interface{}, filePath string) error {
-	tmpl, err := template.New("gen").Parse(tmplStr)
-	if err != nil {
-		return fmt.Errorf("parse template: %w", err)
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return fmt.Errorf("execute template: %w", err)
-	}
-
-	if err := os.WriteFile(filePath, buf.Bytes(), 0644); err != nil {
-		return fmt.Errorf("write file: %w", err)
-	}
-
 	return nil
 }
 
-// executeTemplateWithFuncs 执行带函数的模板并写入文件
-func executeTemplateWithFuncs(tmplStr string, funcMap template.FuncMap, data interface{}, filePath string) error {
-	tmpl, err := template.New("gen").Funcs(funcMap).Parse(tmplStr)
+// 生成 package_gen.go 文件
+func generatePackageFile(serviceName string, methods []MethodInfo) error {
+	const packageTemplate = `package {{.ServiceName}}Service
+
+import (
+	"context"
+	"github.com/Gong-Yang/g-micor/contract/{{.ServiceName}}"
+	"google.golang.org/grpc"
+)
+
+type {{.ServiceName}}LocalClient struct {
+	server Service
+}
+{{range .Methods}}
+func (n {{$.ServiceName}}LocalClient) {{.Name}}(ctx context.Context, in {{.ParamType}}, opts ...grpc.CallOption) ({{.ReturnType}}, error) {
+	return n.server.{{.Name}}(ctx, in)
+}
+{{end}}
+func (n Service) Init(s grpc.ServiceRegistrar) string {
+	{{.ServiceName}}.Client = {{.ServiceName}}LocalClient{server: n} // 本地直接调
+	{{.ServiceName}}.Register{{.ServiceName | title}}Server(s, &n)           // 将服务注册
+	return "{{.ServiceName}}"                              // 服务名称
+}
+`
+
+	funcMap := template.FuncMap{
+		"title": strings.Title,
+	}
+
+	tmpl, err := template.New("package").Funcs(funcMap).Parse(packageTemplate)
 	if err != nil {
-		return fmt.Errorf("parse template: %w", err)
+		return err
+	}
+
+	data := struct {
+		ServiceName string
+		Methods     []MethodInfo
+	}{
+		ServiceName: serviceName,
+		Methods:     methods,
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return fmt.Errorf("execute template: %w", err)
+	err = tmpl.Execute(&buf, data)
+	if err != nil {
+		return err
 	}
 
-	if err := os.WriteFile(filePath, buf.Bytes(), 0644); err != nil {
-		return fmt.Errorf("write file: %w", err)
+	// 格式化代码
+	formatted, err := format.Source(buf.Bytes())
+	if err != nil {
+		return err
 	}
 
+	// 确保目录存在
+	serviceDir := filepath.Join(servicePath, serviceName+"Service")
+	err = os.MkdirAll(serviceDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	// 写入文件
+	filePath := filepath.Join(serviceDir, "package_gen.go")
+	err = os.WriteFile(filePath, formatted, 0644)
+	if err != nil {
+		return err
+	}
+
+	slog.Info("Generated package file", "path", filePath)
 	return nil
 }

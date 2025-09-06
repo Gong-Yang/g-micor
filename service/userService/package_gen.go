@@ -16,6 +16,6 @@ func (n userLocalClient) Register(ctx context.Context, in *user.RegisterReq, opt
 
 func (n Service) Init(s grpc.ServiceRegistrar) string {
 	user.Client = userLocalClient{server: n} // 本地直接调
-	user.RegisterUserServer(s, n)            // 将服务注册
+	user.RegisterUserServer(s, &n)           // 将服务注册
 	return "user"                            // 服务名称
 }

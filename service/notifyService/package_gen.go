@@ -16,6 +16,6 @@ func (n notifyLocalClient) SendEmail(ctx context.Context, in *notify.SendEmailRe
 
 func (n Service) Init(s grpc.ServiceRegistrar) string {
 	notify.Client = notifyLocalClient{server: n} // 本地直接调
-	notify.RegisterNotifyServer(s, n)            // 将服务注册
+	notify.RegisterNotifyServer(s, &n)           // 将服务注册
 	return "notify"                              // 服务名称
 }
