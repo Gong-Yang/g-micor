@@ -1,4 +1,4 @@
-package user_contract
+package user
 
 type RegisterReq struct {
 	Name string

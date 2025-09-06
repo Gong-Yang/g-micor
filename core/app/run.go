@@ -1,34 +1,45 @@
 package app
 
 import (
-	"github.com/Gong-Yang/g-micor/core/discover"
 	"log/slog"
 	"net"
-	"net/rpc"
-	"reflect"
-	"strings"
+	"sync"
+
+	"github.com/Gong-Yang/g-micor/core/discover"
+	"google.golang.org/grpc"
 )
 
-func Run(addr string, gwAddr string, service ...any) {
+type Server interface {
+	Init(s grpc.ServiceRegistrar) string
+}
+
+func Run(addr string, gwAddr string, service ...Server) {
+	listener, _ := net.Listen("tcp", addr)
+	// 初始化服务
+	rpcApp := grpc.NewServer()
 	var ss []string
 	for _, s := range service {
-		serviceName := strings.Split(reflect.TypeOf(s).String(), ".")[0]
+		serviceName := s.Init(rpcApp)
 		slog.Info("register service", "service", serviceName)
 		ss = append(ss, serviceName)
-		err := rpc.RegisterName(serviceName, s)
+	}
+	// 注册中心的客户端服务
+	discover.RegisterClientServer(rpcApp, discover.ClientService{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err := rpcApp.Serve(listener)
 		if err != nil {
-			panic(err)
+			slog.Error("TODO")
 		}
-	}
-	err := rpc.Register(discover.ClientService{})
-	if err != nil {
-		panic(err)
-	}
-	discover.Reg(gwAddr, &discover.RegisterReq{
-		Addr:    addr,
+		wg.Done()
+	}()
+
+	//向注册中心发起注册
+	discover.RegisterCenter(gwAddr, &discover.RegisterReq{
+		Port:    addr,
 		Servers: ss,
 	})
-	listener, _ := net.Listen("tcp", addr)
-	rpc.Accept(listener)
-
+	slog.Info("register success", "servers", ss)
+	wg.Wait()
 }

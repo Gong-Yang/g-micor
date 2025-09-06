@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option go_package = "github.com/Gong-Yang/g-micor/contract/notify";
+
+package notify;
+
+message SendEmailRequest {
+  string to = 1;
+  string subject = 2;
+}
+
+message SendEmailResponse {
+  string message = 1;
+  int32 code = 2;
+}
+
+
+service Notify {
+  rpc SendEmail(SendEmailRequest) returns (SendEmailResponse) {}
+}

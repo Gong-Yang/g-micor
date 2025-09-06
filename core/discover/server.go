@@ -1,17 +1,23 @@
 package discover
 
 import (
-	"github.com/Gong-Yang/g-micor/core/syncx"
+	"context"
+	"errors"
+	"fmt"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/peer"
+	"log"
 	"log/slog"
 	"net"
-	"net/rpc"
 	"strings"
 	"sync"
 	"time"
 )
 
-// 全局存储，用于服务发现的数据存储
-var store = syncx.NewMap[[]string]()
+var (
+	ErrServerNotFind = errors.New("ErrServerNotFind")
+)
 
 // Run 启动服务发现服务器
 // addr: 监听地址，格式为 "host:port"
@@ -26,6 +32,7 @@ func Run(addr string) error {
 		return err
 	}
 	slog.Info("服务发现服务器监听成功", "地址", addr)
+	s := grpc.NewServer()
 
 	// 创建服务实例
 	service := &Service{
@@ -33,22 +40,26 @@ func Run(addr string) error {
 		sNameToSAddr:  make(map[string][]string),
 		sAddrToSNames: make(map[string][]string),
 		sNameToDAddr:  make(map[string][]string),
-		addrStore:     make(map[string]*rpc.Client),
+		addrStore:     make(map[string]ClientClient),
 	}
 
 	// 注册RPC服务
-	err = rpc.Register(service)
-	if err != nil {
-		slog.Error("注册RPC服务失败", "错误", err)
-		return err
-	}
-	slog.Info("RPC服务注册成功")
+	RegisterRegisterServer(s, service)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err = s.Serve(listener)
+		if err != nil {
+			slog.Error("注册RPC服务失败", "错误", err)
+			panic(err)
+		}
+	}()
+	slog.Info("RegisterCenter start")
 
 	// 启动心跳检查
 	go service.startHealthCheck()
-
-	// 接受连接（阻塞运行）
-	rpc.Accept(listener)
+	wg.Wait()
 	return nil
 }
 
@@ -72,7 +83,130 @@ type Service struct {
 
 	// addrStore 地址到RPC客户端的映射
 	// key: 服务器地址，value: 与该服务器的RPC连接客户端
-	addrStore map[string]*rpc.Client
+	addrStore map[string]ClientClient
+	UnimplementedRegisterServer
+}
+
+// Register 处理服务注册请求
+// 当一个服务启动时，会调用此方法将自己注册到服务发现中心
+func (s *Service) Register(ctx context.Context, req *RegisterReq) (res *RegisterRes, err error) {
+	// 获取客户端地址
+	clientAddr := req.Port
+	p, ok := peer.FromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("无法获取对等方信息")
+	}
+	if tcpAddr, ok := p.Addr.(*net.TCPAddr); ok {
+		clientIP := tcpAddr.IP.String()
+		clientAddr = fmt.Sprintf("[%s]%s", clientIP, clientAddr)
+	}
+	slog.Info("收到服务注册请求", "地址", clientAddr, "提供服务", req.Servers)
+
+	// 建立与注册服务的RPC连接，用于后续的健康检查和通知
+	conn, err := grpc.NewClient(clientAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("fail to dial: %v", err)
+	}
+	client := NewClientClient(conn)
+	slog.Info("与注册服务建立连接成功", "服务地址", clientAddr)
+
+	// 获取写锁，更新服务映射关系
+	s.lock.Lock()
+	s.addrStore[clientAddr] = client
+
+	// 更新服务名到地址的映射
+	for _, serverName := range req.Servers {
+		// 检查是否已存在该地址，避免重复添加
+		addrs := s.sNameToSAddr[serverName]
+		alreadyExists := false
+		for _, addr := range addrs {
+			if addr == clientAddr {
+				alreadyExists = true
+				break
+			}
+		}
+		if !alreadyExists {
+			s.sNameToSAddr[serverName] = append(s.sNameToSAddr[serverName], clientAddr)
+		}
+	}
+
+	// 更新地址到服务名的映射
+	s.sAddrToSNames[clientAddr] = req.Servers
+
+	// 释放写锁
+	s.lock.Unlock()
+	slog.Info("服务注册信息更新完成", "服务地址", clientAddr)
+
+	// 通知所有关注这些服务的客户端
+	for _, serverName := range req.Servers {
+		s.notifySubscribers(&NotifyReq{
+			Type:   "register",
+			Server: serverName,
+			Addr:   clientAddr,
+		})
+	}
+
+	// 返回成功响应
+	slog.Info("服务注册成功", "地址", clientAddr, "服务名", req.Servers)
+	return
+}
+
+// Discover 处理服务发现请求
+// 当一个服务需要调用另一个服务时，会调用此方法获取目标服务的地址列表
+func (s *Service) Discover(ctx context.Context, req *Req) (res *Resp, err error) {
+	// 获取客户端地址
+	clientAddr := req.Port
+	p, ok := peer.FromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("无法获取对等方信息")
+	}
+	if tcpAddr, ok := p.Addr.(*net.TCPAddr); ok {
+		clientIP := tcpAddr.IP.String()
+		clientAddr = fmt.Sprintf("[%s]%s", clientIP, clientAddr)
+	}
+	slog.Info("收到服务发现请求", "请求者地址", clientAddr, "目标服务", req.Server)
+
+	// 获取读锁，查找目标服务的地址列表
+	s.lock.RLock()
+	sAddr := s.sNameToSAddr[req.Server]
+	s.lock.RUnlock()
+
+	// 检查服务是否存在
+	if len(sAddr) == 0 {
+		slog.Error("未找到目标服务", "服务名", req.Server)
+		return res, ErrServerNotFind
+	}
+
+	// 获取写锁，将请求者添加到服务订阅列表
+	// 这样当目标服务有变化时（新增实例、实例下线等），可以主动通知请求者
+	s.lock.Lock()
+
+	// 检查是否已经订阅，避免重复添加
+	subscribers := s.sNameToDAddr[req.Server]
+	alreadySubscribed := false
+	for _, subscriber := range subscribers {
+		if subscriber == clientAddr {
+			alreadySubscribed = true
+			break
+		}
+	}
+
+	if !alreadySubscribed {
+		s.sNameToDAddr[req.Server] = append(s.sNameToDAddr[req.Server], clientAddr)
+		slog.Info("添加服务订阅者", "服务名", req.Server, "订阅者地址", clientAddr)
+	}
+
+	s.lock.Unlock()
+
+	// 构造响应
+	res = &Resp{
+		Server: req.Server,
+		Addr:   make([]string, len(sAddr)),
+	}
+	copy(res.Addr, sAddr)
+
+	slog.Info("服务发现成功", "服务名", req.Server, "地址列表", strings.Join(sAddr, ","))
+	return
 }
 
 /*
@@ -105,110 +239,6 @@ type Service struct {
    - 通知关注的客户端更新服务列表
 */
 
-// Register 处理服务注册请求
-// 当一个服务启动时，会调用此方法将自己注册到服务发现中心
-func (s *Service) Register(req RegisterReq, res *RegisterRes) error {
-	slog.Info("收到服务注册请求", "地址", req.Addr, "服务名", req.Name, "提供服务", req.Servers)
-
-	// 建立与注册服务的RPC连接，用于后续的健康检查和通知
-	dial, err := rpc.Dial("tcp", req.Addr)
-	if err != nil {
-		slog.Error("连接注册服务失败", "错误", err, "服务地址", req.Addr)
-		res.Code = 500
-		return err
-	}
-	slog.Info("与注册服务建立连接成功", "服务地址", req.Addr)
-
-	// 获取写锁，更新服务映射关系
-	s.lock.Lock()
-
-	// 保存RPC客户端连接
-	s.addrStore[req.Addr] = dial
-
-	// 更新服务名到地址的映射
-	for _, serverName := range req.Servers {
-		// 检查是否已存在该地址，避免重复添加
-		addrs := s.sNameToSAddr[serverName]
-		alreadyExists := false
-		for _, addr := range addrs {
-			if addr == req.Addr {
-				alreadyExists = true
-				break
-			}
-		}
-		if !alreadyExists {
-			s.sNameToSAddr[serverName] = append(s.sNameToSAddr[serverName], req.Addr)
-		}
-	}
-
-	// 更新地址到服务名的映射
-	s.sAddrToSNames[req.Addr] = req.Servers
-
-	// 释放写锁
-	s.lock.Unlock()
-	slog.Info("服务注册信息更新完成", "服务地址", req.Addr)
-
-	// 通知所有关注这些服务的客户端
-	for _, serverName := range req.Servers {
-		s.notifySubscribers(&NotifyReq{
-			Type:   "register",
-			Server: serverName,
-			Addr:   req.Addr,
-		})
-	}
-
-	// 返回成功响应
-	res.Code = 200
-	slog.Info("服务注册成功", "地址", req.Addr, "服务名", req.Servers)
-	return nil
-}
-
-// Discover 处理服务发现请求
-// 当一个服务需要调用另一个服务时，会调用此方法获取目标服务的地址列表
-func (s *Service) Discover(req *Req, res *Resp) error {
-	slog.Info("收到服务发现请求", "请求者地址", req.Addr, "目标服务", req.Server)
-
-	// 获取读锁，查找目标服务的地址列表
-	s.lock.RLock()
-	sAddr := s.sNameToSAddr[req.Server]
-	s.lock.RUnlock()
-
-	// 检查服务是否存在
-	if len(sAddr) == 0 {
-		slog.Error("未找到目标服务", "服务名", req.Server)
-		return ErrServerNotFind
-	}
-
-	// 获取写锁，将请求者添加到服务订阅列表
-	// 这样当目标服务有变化时（新增实例、实例下线等），可以主动通知请求者
-	s.lock.Lock()
-
-	// 检查是否已经订阅，避免重复添加
-	subscribers := s.sNameToDAddr[req.Server]
-	alreadySubscribed := false
-	for _, subscriber := range subscribers {
-		if subscriber == req.Addr {
-			alreadySubscribed = true
-			break
-		}
-	}
-
-	if !alreadySubscribed {
-		s.sNameToDAddr[req.Server] = append(s.sNameToDAddr[req.Server], req.Addr)
-		slog.Info("添加服务订阅者", "服务名", req.Server, "订阅者地址", req.Addr)
-	}
-
-	s.lock.Unlock()
-
-	// 构造响应
-	res.Server = req.Server
-	res.Addr = make([]string, len(sAddr))
-	copy(res.Addr, sAddr)
-
-	slog.Info("服务发现成功", "服务名", req.Server, "地址列表", strings.Join(sAddr, ","))
-	return nil
-}
-
 // notifySubscribers 通知所有订阅指定服务的客户端
 // 当服务有变更时（新增实例、实例下线等），调用此方法通知关注的客户端
 func (s *Service) notifySubscribers(notifyReq *NotifyReq) {
@@ -240,9 +270,8 @@ func (s *Service) notifySubscribers(notifyReq *NotifyReq) {
 		}
 
 		// 异步发送通知，避免阻塞其他操作
-		go func(client *rpc.Client, addr string, req *NotifyReq) {
-			var notifyRes NotifyRes
-			err := client.Call("ClientService.SubscribeServerRegister", req, &notifyRes)
+		go func(client ClientClient, addr string, req *NotifyReq) {
+			_, err := client.SubscribeServerRegister(context.Background(), req)
 			if err != nil {
 				slog.Error("通知订阅者失败", "错误", err, "订阅者地址", addr, "服务名", req.Server)
 				// 如果通知失败，可能是订阅者已经下线，清理订阅关系
@@ -289,7 +318,7 @@ func (s *Service) startHealthCheck() {
 
 // performHealthCheck 执行健康检查
 func (s *Service) performHealthCheck() {
-	slog.Debug("开始执行健康检查")
+	//slog.Info("开始执行健康检查")
 
 	// 获取所有需要检查的地址
 	s.lock.RLock()
@@ -315,29 +344,16 @@ func (s *Service) isServiceHealthy(addr string) bool {
 	s.lock.RUnlock()
 
 	if client == nil {
+		slog.Error("RPC客户端不存在", "地址", addr)
 		return false
 	}
 
-	// 创建一个带超时的channel
-	done := make(chan error, 1)
-	go func() {
-		var pingRes PingRes
-		err := client.Call("ClientService.Ping", &PingReq{}, &pingRes)
-		done <- err
-	}()
-
-	// 等待结果或超时
-	select {
-	case err := <-done:
-		if err != nil {
-			slog.Debug("服务健康检查失败", "地址", addr, "错误", err)
-			return false
-		}
-		return true
-	case <-time.After(5 * time.Second):
-		slog.Debug("服务健康检查超时", "地址", addr)
+	_, err := client.Ping(context.Background(), &PingReq{})
+	if err != nil {
+		slog.Error("服务不健康", "错误", err, "地址", addr)
 		return false
 	}
+	return true
 }
 
 // handleUnhealthyService 处理不健康的服务
@@ -352,7 +368,7 @@ func (s *Service) handleUnhealthyService(addr string) {
 
 	// 关闭并移除RPC客户端
 	if client := s.addrStore[addr]; client != nil {
-		client.Close()
+		//client.Close()
 		delete(s.addrStore, addr)
 	}
 

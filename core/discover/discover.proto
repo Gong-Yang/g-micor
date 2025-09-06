@@ -1,0 +1,57 @@
+syntax = "proto3";
+//    protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative core/discover/discover.proto
+option go_package = "github.com/Gong-Yang/g-micor/core/discover";
+
+package discover;
+
+// 服务发现请求
+message Req {
+  string port = 1;   // 请求者的地址
+  string server = 2; // 请求者需要发现的服务
+}
+
+// 服务发现响应
+message Resp {
+  string server = 1;           // 服务名称
+  repeated string addr = 2;    // 服务地址
+}
+
+// 服务注册请求
+message RegisterReq {
+  string port = 1;
+  repeated string servers = 3; // 服务列表
+}
+
+// 服务注册响应
+message RegisterRes {
+}
+
+// ping 请求
+message PingReq {
+}
+
+// ping 响应
+message PingRes {
+}
+
+// 服务新增通知请求
+message NotifyReq {
+  string type = 1;   // 通知类型 1. register 服务上线 2. del 服务下线
+  string server = 2; // 服务名
+  string addr = 3;   // 服务地址
+}
+
+// 服务新增通知响应
+message NotifyRes {
+}
+
+
+service Register {
+  rpc Register(RegisterReq) returns (RegisterRes) {}
+  rpc Discover(Req) returns (Resp) {}
+}
+
+service Client {
+  rpc Ping(PingReq) returns (PingRes) {}
+  rpc SubscribeServerRegister(NotifyReq) returns (NotifyRes) {}
+}

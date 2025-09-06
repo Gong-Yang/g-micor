@@ -60,3 +60,6 @@ g-micor/
 4. 暴露方法规范： 
    1. 入参只有一个， 响应有结果和错误
    2. 入参和结果的结构体必须定义在契约目录下
+
+
+protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative contract/notify/notify.proto

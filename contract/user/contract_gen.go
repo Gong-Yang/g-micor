@@ -1,4 +1,4 @@
-package user_contract
+package user
 
 import (
 	"github.com/Gong-Yang/g-micor/core/discover"

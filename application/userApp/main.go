@@ -2,8 +2,7 @@ package main
 
 import (
 	"github.com/Gong-Yang/g-micor/core/app"
-	"github.com/Gong-Yang/g-micor/service/notify"
-	"github.com/Gong-Yang/g-micor/service/user"
+	"github.com/Gong-Yang/g-micor/service/notifyService"
 )
 
 func main() {
@@ -18,6 +17,6 @@ func main() {
 	//}()
 
 	app.Run(":8000", ":1234",
-		user.Service{},
-		notify.Service{})
+		//userService.Service{},
+		notifyService.Service{})
 }

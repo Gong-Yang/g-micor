@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/Gong-Yang/g-micor/contract/order_contract"
+	"context"
+	"github.com/Gong-Yang/g-micor/contract/order"
 	"github.com/Gong-Yang/g-micor/core/app"
-	"github.com/Gong-Yang/g-micor/service/order"
+	"github.com/Gong-Yang/g-micor/service/orderService"
 	"log/slog"
 	"time"
 )
@@ -13,7 +14,7 @@ func main() {
 	go func() {
 		for {
 			time.Sleep(time.Second * 10)
-			res, err := order.Create(&order_contract.CreateReq{
+			res, err := order.Client.Create(context.Background(), &order.CreateReq{
 				GoodsId: 1,
 				UserId:  1,
 			})
@@ -22,5 +23,5 @@ func main() {
 
 	}()
 	app.Run(":8002", gwAddr,
-		order.Service{})
+		orderService.Service{})
 }
