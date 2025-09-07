@@ -187,6 +187,23 @@ func getTypeString(expr ast.Expr) string {
 	return ""
 }
 
+// 去掉类型名的包名前缀
+func removePackagePrefix(typeName string) string {
+	// 如果包含包名前缀（如 *notify.SendEmailRequest），只保留类型名部分
+	if strings.Contains(typeName, ".") {
+		parts := strings.Split(typeName, ".")
+		if len(parts) == 2 {
+			// 处理指针类型
+			if strings.HasPrefix(parts[0], "*") {
+				return "*" + parts[1]
+			} else {
+				return parts[1]
+			}
+		}
+	}
+	return typeName
+}
+
 // 生成 contract_gen.go 文件
 func generateContractFile(serviceName string, methods []MethodInfo) error {
 	const contractTemplate = `package {{.ServiceName}}
@@ -215,7 +232,7 @@ func (n *{{.ServiceName}}RemoteClient) init() error {
 	return nil
 }
 {{range .Methods}}
-func (n *{{$.ServiceName}}RemoteClient) {{.Name}}(ctx context.Context, in {{.ParamType}}, opts ...grpc.CallOption) ({{.ReturnType}}, error) {
+func (n *{{$.ServiceName}}RemoteClient) {{.Name}}(ctx context.Context, in {{.ParamType | removePackagePrefix}}, opts ...grpc.CallOption) ({{.ReturnType | removePackagePrefix}}, error) {
 	if n.client == nil {
 		err := n.init()
 		if err != nil {
@@ -228,7 +245,8 @@ func (n *{{$.ServiceName}}RemoteClient) {{.Name}}(ctx context.Context, in {{.Par
 `
 
 	funcMap := template.FuncMap{
-		"title": strings.Title,
+		"title":               strings.Title,
+		"removePackagePrefix": removePackagePrefix,
 	}
 
 	tmpl, err := template.New("contract").Funcs(funcMap).Parse(contractTemplate)
