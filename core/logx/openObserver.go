@@ -1,4 +1,4 @@
-package gslog
+package logx
 
 import (
 	"bytes"
@@ -14,12 +14,10 @@ import (
 
 // OpenObserveHandler 是一个将日志发送到OpenObserve的slog.Handler实现
 type OpenObserveHandler struct {
-	opts       OpenObserveOptions
-	httpClient *http.Client
-	attrs      []slog.Attr
-	groups     []string
-	level      slog.Level
-	addSource  bool
+	opts           OpenObserveOptions //连接信息
+	httpClient     *http.Client       //http客户端
+	addSource      bool
+	addSourceLevel slog.Level //添加源码位置的日志等级
 
 	// 批量处理相关字段
 	mu          sync.Mutex
@@ -54,7 +52,8 @@ type OpenObserveOptions struct {
 
 // Handle 处理日志记录事件
 func (h *OpenObserveHandler) Handle(ctx context.Context, record slog.Record) error {
-	if !h.Enabled(ctx, record.Level) {
+	level := record.Level
+	if !h.Enabled(ctx, level) {
 		return nil
 	}
 
@@ -62,11 +61,10 @@ func (h *OpenObserveHandler) Handle(ctx context.Context, record slog.Record) err
 	logEntry := make(map[string]interface{})
 
 	// 添加基本字段
-	logEntry["level"] = record.Level.String()
+	logEntry["level"] = level.String()
 	logEntry["message"] = record.Message
-
 	// 添加源代码位置信息（如果启用）
-	if h.addSource && record.PC != 0 {
+	if level.Level() >= h.addSourceLevel && record.PC != 0 {
 		fs := runtime.CallersFrames([]uintptr{record.PC})
 		f, _ := fs.Next()
 		if f.File != "" {
@@ -97,7 +95,7 @@ func (h *OpenObserveHandler) Handle(ctx context.Context, record slog.Record) err
 }
 
 // NewOpenObserveHandler 创建一个新的OpenObserve日志处理器
-func NewOpenObserveHandler(opts OpenObserveOptions, addSource bool) *OpenObserveHandler {
+func NewOpenObserveHandler(opts OpenObserveOptions, addSourceLevel slog.Level) *OpenObserveHandler {
 	// 使用默认值填充未设置的选项
 	if opts.Endpoint == "" {
 		panic("OpenObserveOptions.Endpoint is required")
@@ -127,13 +125,13 @@ func NewOpenObserveHandler(opts OpenObserveOptions, addSource bool) *OpenObserve
 	ctx, cancel := context.WithCancel(context.Background())
 
 	h := &OpenObserveHandler{
-		opts:       opts,
-		httpClient: &http.Client{Timeout: opts.Timeout},
-		addSource:  addSource,
-		buffer:     make([]map[string]interface{}, 0, 100), // 使用固定的初始容量
-		ctx:        ctx,
-		cancel:     cancel,
-		handler:    opts.Handler,
+		opts:           opts,
+		httpClient:     &http.Client{Timeout: opts.Timeout},
+		addSourceLevel: addSourceLevel,
+		buffer:         make([]map[string]interface{}, 0, 100), // 使用固定的初始容量
+		ctx:            ctx,
+		cancel:         cancel,
+		handler:        opts.Handler,
 	}
 	// 启动定时发送协程
 	h.flushTicker = time.NewTicker(opts.FlushInterval)

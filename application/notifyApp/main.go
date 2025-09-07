@@ -6,7 +6,5 @@ import (
 )
 
 func main() {
-	gwAddr := ":1234"
-	app.Run(":8001", gwAddr,
-		notifyService.Service{})
+	app.Run(notifyService.Service{})
 }

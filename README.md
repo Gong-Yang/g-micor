@@ -64,3 +64,15 @@ g-micor/
 proto：
 `protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative contract/user/user.proto`
 
+
+openObserver :
+```shell
+docker run -d \
+  --name openobserve \
+  -p 5080:5080 \
+  -e RUST_LOG=debug \
+  -e ZO_ROOT_USER_EMAIL=chaiyi.fun@qq.com \
+  -e ZO_ROOT_USER_PASSWORD=xJGhYSVPynFmNACVTu5X \
+  -v /data/openobserve_data:/data \
+  public.ecr.aws/zinclabs/openobserve:latest
+```

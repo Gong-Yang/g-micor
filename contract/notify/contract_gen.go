@@ -23,6 +23,7 @@ func (n *notifyRemoteClient) init() error {
 	slog.Info("notify remote client init")
 	return nil
 }
+
 func (n *notifyRemoteClient) SendEmail(ctx context.Context, in *SendEmailRequest, opts ...grpc.CallOption) (*SendEmailResponse, error) {
 	if n.client == nil {
 		err := n.init()

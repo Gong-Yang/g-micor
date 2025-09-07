@@ -10,7 +10,6 @@ import (
 )
 
 func main() {
-	gwAddr := ":1234"
 	go func() {
 		for {
 			time.Sleep(time.Second * 10)
@@ -22,6 +21,5 @@ func main() {
 		}
 
 	}()
-	app.Run(":8002", gwAddr,
-		orderService.Service{})
+	app.Run(orderService.Service{})
 }

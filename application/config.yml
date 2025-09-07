@@ -1,0 +1,29 @@
+# 全局配置文件
+
+app:
+  centerAddr: ':1234'
+  loglevel: debug
+
+mongo:
+  uri: mongodb://root:cT93YrhLJt3nwDuX@8.134.198.135:6664/
+  database: demo1
+
+redis:
+  addr: 8.134.198.135:7334
+  db: 0
+  password: frSWFkkKVj8HYeNX
+  tls: false
+
+mail:
+  host: smtp.163.com
+  port: 465
+  username: ggyystudio@163.com
+  password: DZsDfE7faVswYB8A
+
+observe:
+  #  endpoint: http://127.0.0.1:5080
+  endpoint: https://log.chaiyi.fun
+  organization: default
+  stream: application
+  username: chaiyi.fun@qq.com
+  password: xJGhYSVPynFmNACVTu5X

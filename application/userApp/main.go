@@ -21,7 +21,6 @@ func main() {
 		}
 	}()
 
-	app.Run(":8000", ":1234",
-		userService.Service{},
+	app.Run(userService.Service{},
 		notifyService.Service{})
 }

@@ -18,7 +18,7 @@ import (
 
 // 生成package_gen.go、contract_gen.go
 const (
-	service = "test" //需要生成的service
+	service = "notify" //需要生成的service
 
 	servicePath  = "./service/"
 	contractPath = "./contract/"

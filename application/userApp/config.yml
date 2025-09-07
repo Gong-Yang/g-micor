@@ -1,0 +1,5 @@
+# 应用配置文件
+
+app:
+  name: userApp
+  port: 5002
