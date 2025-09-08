@@ -13,6 +13,7 @@ type Config struct {
 type AppConfig struct {
 	Name       string
 	Port       int
+	RpcPort    int    `yaml:"rpcPort"`
 	CenterAddr string `yaml:"centerAddr"`
 	LogLevel   string
 }

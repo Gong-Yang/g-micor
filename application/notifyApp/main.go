@@ -6,5 +6,5 @@ import (
 )
 
 func main() {
-	app.Run(notifyService.Service{})
+	app.Run(&notifyService.Service{})
 }

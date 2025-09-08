@@ -3,3 +3,4 @@
 app:
   name: orderApp
   port: 5001
+  rpcPort: 4001

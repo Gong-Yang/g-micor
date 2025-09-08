@@ -3,3 +3,4 @@
 app:
   name: userApp
   port: 5002
+  rpcPort: 4002

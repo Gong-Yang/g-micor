@@ -303,16 +303,16 @@ import (
 )
 
 type {{.ServiceName}}LocalClient struct {
-	server Service
+	server *Service
 }
 {{range .Methods}}
-func (n {{$.ServiceName}}LocalClient) {{.Name}}(ctx context.Context, in {{.ParamType}}, opts ...grpc.CallOption) ({{.ReturnType}}, error) {
+func (n *{{$.ServiceName}}LocalClient) {{.Name}}(ctx context.Context, in {{.ParamType}}, opts ...grpc.CallOption) ({{.ReturnType}}, error) {
 	return n.server.{{.Name}}(ctx, in)
 }
 {{end}}
-func (n Service) Init(s grpc.ServiceRegistrar) string {
-	{{.ServiceName}}.Client = {{.ServiceName}}LocalClient{server: n} // 本地直接调
-	{{.ServiceName}}.Register{{.ServiceName | title}}Server(s, &n)           // 将服务注册
+func (n *Service) Init(s grpc.ServiceRegistrar) string {
+	{{.ServiceName}}.Client = &{{.ServiceName}}LocalClient{server: n} // 本地直接调
+	{{.ServiceName}}.Register{{.ServiceName | title}}Server(s, n)           // 将服务注册
 	return "{{.ServiceName}}"                              // 服务名称
 }
 `
