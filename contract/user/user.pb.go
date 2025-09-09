@@ -67,7 +67,7 @@ func (x *RegisterReq) GetName() string {
 
 type RegisterRes struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -103,7 +103,7 @@ func (*RegisterRes) Descriptor() ([]byte, []int) {
 	return file_contract_user_user_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *RegisterRes) GetId() int32 {
+func (x *RegisterRes) GetId() uint64 {
 	if x != nil {
 		return x.Id
 	}
@@ -125,7 +125,7 @@ const file_contract_user_user_proto_rawDesc = "" +
 	"\vRegisterReq\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"1\n" +
 	"\vRegisterRes\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name2:\n" +
 	"\x04User\x122\n" +
 	"\bRegister\x12\x11.user.RegisterReq\x1a\x11.user.RegisterRes\"\x00B,Z*github.com/Gong-Yang/g-micor/contract/userb\x06proto3"

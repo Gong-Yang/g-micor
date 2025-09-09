@@ -2,13 +2,28 @@ package store
 
 import (
 	"github.com/Gong-Yang/g-micor/core/mongox"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var UserStore = &userStore{CollName: "user"}
-
 type User struct {
-	Id primitive.ObjectID
+	*mongox.Base `bson:",inline"`
+	UserName     string `bson:"userName,omitempty"`
 }
 
-type userStore mongox.Coll[User]
+var UserStore = &userStore{
+	Coll: &mongox.Coll[User]{
+		CollName: "user",
+		Indexes: []mongo.IndexModel{
+			{
+				Keys:    bson.D{{"userName", 1}},
+				Options: options.Index().SetUnique(true),
+			},
+		},
+	},
+}
+
+type userStore struct {
+	*mongox.Coll[User]
+}

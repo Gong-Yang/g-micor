@@ -2,8 +2,9 @@ package userService
 
 import (
 	"context"
-	"github.com/Gong-Yang/g-micor/contract/notify"
 	"github.com/Gong-Yang/g-micor/contract/user"
+	"github.com/Gong-Yang/g-micor/core/mongox"
+	"github.com/Gong-Yang/g-micor/store"
 	"log/slog"
 )
 
@@ -14,17 +15,18 @@ type Service struct {
 func (s *Service) Register(ctx context.Context, req *user.RegisterReq) (*user.RegisterRes, error) {
 	slog.Info("register user", "req", req)
 
-	response, err := notify.Client.SendEmail(ctx, &notify.SendEmailRequest{
-		Subject: "register",
-		To:      "<EMAIL>",
-	})
+	user_ := &store.User{
+		Base:     &mongox.Base{},
+		UserName: req.Name,
+	}
+	_, err := store.UserStore.InsertOne(ctx, user_)
 	if err != nil {
-		slog.Error("send email error", "error", err)
+		slog.Error("insert user error", "error", err)
 		return nil, err
 	}
-	slog.Info("send email success", "response", response)
+
 	return &user.RegisterRes{
-		Id:   1,
+		Id:   user_.Id,
 		Name: req.Name,
 	}, nil
 }

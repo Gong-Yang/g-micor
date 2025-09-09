@@ -101,6 +101,7 @@ func wrapError(ctx *gin.Context, a any, isPanic bool) {
 				"stack", string(buf[:n]),
 				"path", ctx.Request.URL.Path)
 			ctx.AbortWithStatus(http.StatusInternalServerError)
+			return
 		} else {
 			slog.WarnContext(ctx, "sysError",
 				"err", a,
@@ -108,7 +109,6 @@ func wrapError(ctx *gin.Context, a any, isPanic bool) {
 				"path", ctx.Request.URL.Path)
 			appErr = ErrorCode{Code: RespErr, Msg: "请联系管理员"}
 		}
-		return
 	}
 
 	// 业务错误

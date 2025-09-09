@@ -11,6 +11,8 @@ import (
 var collMap = syncx.NewResourceManager[mongo.Collection]()
 
 type CollInterface interface {
+	Create()
+	Update()
 }
 
 type Coll[T CollInterface] struct {
@@ -24,6 +26,16 @@ func (t *Coll[T]) FindOne(ctx context.Context, filter interface{},
 	err = coll.FindOne(ctx, filter, opts...).Decode(&res)
 	return
 }
+
+func (t *Coll[T]) InsertOne(ctx context.Context, document interface{},
+	opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+	coll := getColl(ctx, t)
+	if c, ok := document.(CollInterface); ok {
+		c.Create()
+	}
+	return coll.InsertOne(ctx, document, opts...)
+}
+
 func (t *Coll[T]) GetColl(ctx context.Context) *mongo.Collection {
 	return getColl(ctx, t)
 }
