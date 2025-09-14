@@ -1,25 +1,28 @@
 package ginx
 
 import (
+	"encoding/json"
 	"errors"
-	"fmt"
 )
 
 // 响应码对象
 type Response struct {
-	Code string `json:"code,omitempty"`
-	Msg  string `json:"msg,omitempty"`
-	Data any    `json:"data,omitempty"`
+	Model string `json:"model,omitempty"`
+	Code  string `json:"code,omitempty"`
+	Msg   string `json:"msg,omitempty"`
+	Data  any    `json:"data,omitempty"`
 }
 
 type ErrorCode struct {
-	Code string `json:"code,omitempty"`
-	Msg  string `json:"msg,omitempty"`
+	Model string `json:"model,omitempty"`
+	Code  string `json:"code,omitempty"`
+	Msg   string `json:"msg,omitempty"`
 }
 
 // 实现error接口
 func (r ErrorCode) Error() string {
-	return fmt.Sprintf("%s:%s", r.Code, r.Msg)
+	marshal, _ := json.Marshal(r)
+	return string(marshal)
 }
 func (r ErrorCode) Is(target error) bool {
 	// 类型断言，确保target是MyError类型
@@ -29,18 +32,20 @@ func (r ErrorCode) Is(target error) bool {
 		return false
 	}
 	// 比较关键字段Code
-	return r.Code == t.Code
+	return r.Model == t.Model && r.Code == t.Code
 }
 func (r ErrorCode) ToRes() Response {
 	res := Response{
-		Code: r.Code,
-		Msg:  r.Msg,
+		Model: r.Model,
+		Code:  r.Code,
+		Msg:   r.Msg,
 	}
 	return res
 }
-func NewErr(code, msg string) error {
+func NewErr(code, msg, model string) error {
 	return ErrorCode{
-		Code: code,
-		Msg:  msg,
+		Model: model,
+		Code:  code,
+		Msg:   msg,
 	}
 }
