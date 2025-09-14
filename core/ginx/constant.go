@@ -23,8 +23,3 @@ var (
 	STRING = "STRING"
 	BOOL   = "BOOL"
 )
-
-var (
-	RespSuccess = "S000"
-	RespErr     = "F000"
-)

@@ -3,6 +3,7 @@ package ginx
 import (
 	"context"
 	"errors"
+	"github.com/Gong-Yang/g-micor/core/errorx"
 	"github.com/Gong-Yang/g-micor/core/util/random"
 	"github.com/gin-gonic/gin"
 	"log/slog"
@@ -73,7 +74,7 @@ func wrapResponse(ctx *gin.Context) {
 	}
 	value, exists := ctx.Get(ContextFuncResult)
 	if !exists {
-		ctx.JSON(http.StatusOK, Response{Code: RespSuccess})
+		ctx.JSON(http.StatusOK, Response{Code: errorx.RespSuccess})
 		return
 	}
 	funcResults := value.([]interface{})
@@ -86,11 +87,11 @@ func wrapResponse(ctx *gin.Context) {
 		wrapError(ctx, funcResults[1], false)
 		return
 	}
-	ctx.JSON(http.StatusOK, Response{Code: RespSuccess, Data: funcResults[0]})
+	ctx.JSON(http.StatusOK, Response{Code: errorx.RespSuccess, Data: funcResults[0]})
 }
 
 func wrapError(ctx *gin.Context, a any, isPanic bool) {
-	appErr, ok := a.(ErrorCode)
+	appErr, ok := a.(errorx.ErrorCode)
 	if !ok {
 		buf := make([]byte, 1024)
 		n := runtime.Stack(buf, false)
@@ -107,15 +108,14 @@ func wrapError(ctx *gin.Context, a any, isPanic bool) {
 				"err", a,
 				"stack", string(buf[:n]),
 				"path", ctx.Request.URL.Path)
-			appErr = ErrorCode{Code: RespErr, Msg: "请联系管理员"}
+			appErr = errorx.ErrorCode{Code: errorx.RespErr, Msg: "请联系管理员"}
 		}
 	}
 
 	// 业务错误
-	toResponse := appErr.ToRes()
 	slog.InfoContext(ctx, "business err response",
 		"err", appErr,
-		"response", toResponse,
+		"response", appErr,
 		"path", ctx.Request.URL.Path)
-	ctx.AbortWithStatusJSON(http.StatusOK, toResponse)
+	ctx.AbortWithStatusJSON(http.StatusOK, appErr)
 }

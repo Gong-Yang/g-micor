@@ -2,8 +2,6 @@ package app
 
 import (
 	"github.com/Gong-Yang/g-micor/core/config"
-	"github.com/Gong-Yang/g-micor/core/errorx"
-	"github.com/Gong-Yang/g-micor/core/ginx"
 	"github.com/Gong-Yang/g-micor/core/mongox"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -17,8 +15,6 @@ type Server interface {
 
 func Run(service ...Server) {
 	var wg = &sync.WaitGroup{}
-	// 初始化错误
-	errorx.New = ginx.NewErr
 	// 初始化配置
 	initConf()
 	// 初始化日志
