@@ -26,7 +26,7 @@ func (r ErrorCode) Is(target error) bool {
 	// 比较关键字段Code
 	return r.Model == t.Model && r.Code == t.Code
 }
-func NewErr(model, code, msg string) ErrorCode {
+func New(model, code, msg string) ErrorCode {
 	return ErrorCode{
 		Model: model,
 		Code:  code,
