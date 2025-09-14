@@ -2,7 +2,6 @@ package mongox
 
 import (
 	"github.com/Gong-Yang/g-micor/core/util/random"
-	"log/slog"
 	"time"
 )
 
@@ -17,12 +16,7 @@ func (b *Base) GetId() any {
 }
 
 func (b *Base) Create() {
-	slog.Info("create ~~~~~~~~~~~~~~~")
 	b.Id = random.Snoyflake()
 	b.CreateTime = time.Now()
-	b.UpdateTime = time.Now()
-}
-
-func (b *Base) Update() {
 	b.UpdateTime = time.Now()
 }

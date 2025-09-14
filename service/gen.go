@@ -18,7 +18,7 @@ import (
 
 // 生成package_gen.go、contract_gen.go
 const (
-	service = "notify" //需要生成的service
+	service = "agent" //需要生成的service
 
 	servicePath  = "./service/"
 	contractPath = "./contract/"
@@ -210,7 +210,7 @@ func generateContractFile(serviceName string, methods []MethodInfo) error {
 
 import (
 	"context"
-	"github.com/Gong-Yang/g-micor/core/discover"
+	"github.com/Gong-Yang/DBuddy/core/discover"
 	"google.golang.org/grpc"
 	"log/slog"
 )
@@ -221,25 +221,25 @@ type {{.ServiceName}}RemoteClient struct {
 	client {{.ServiceName | title}}Client
 }
 
-func (n *{{.ServiceName}}RemoteClient) init() error {
+func (s *{{.ServiceName}}RemoteClient) init() error {
 	c, err := discover.Grpc("{{.ServiceName}}")
 	if err != nil {
 		return err
 	}
 	client := New{{.ServiceName | title}}Client(c)
-	n.client = client
+	s.client = client
 	slog.Info("{{.ServiceName}} remote client init")
 	return nil
 }
 {{range .Methods}}
-func (n *{{$.ServiceName}}RemoteClient) {{.Name}}(ctx context.Context, in {{.ParamType | removePackagePrefix}}, opts ...grpc.CallOption) ({{.ReturnType | removePackagePrefix}}, error) {
-	if n.client == nil {
-		err := n.init()
+func (s *{{$.ServiceName}}RemoteClient) {{.Name}}(ctx context.Context, in {{.ParamType | removePackagePrefix}}, opts ...grpc.CallOption) ({{.ReturnType | removePackagePrefix}}, error) {
+	if s.client == nil {
+		err := s.init()
 		if err != nil {
 			return nil, err
 		}
 	}
-	return n.client.{{.Name}}(ctx, in, opts...)
+	return s.client.{{.Name}}(ctx, in, opts...)
 }
 {{end}}
 `
@@ -298,7 +298,7 @@ func generatePackageFile(serviceName string, methods []MethodInfo) error {
 
 import (
 	"context"
-	"github.com/Gong-Yang/g-micor/contract/{{.ServiceName}}"
+	"github.com/Gong-Yang/DBuddy/contract/{{.ServiceName}}"
 	"google.golang.org/grpc"
 )
 
@@ -306,13 +306,13 @@ type {{.ServiceName}}LocalClient struct {
 	server *Service
 }
 {{range .Methods}}
-func (n *{{$.ServiceName}}LocalClient) {{.Name}}(ctx context.Context, in {{.ParamType}}, opts ...grpc.CallOption) ({{.ReturnType}}, error) {
-	return n.server.{{.Name}}(ctx, in)
+func (s *{{$.ServiceName}}LocalClient) {{.Name}}(ctx context.Context, in {{.ParamType}}, opts ...grpc.CallOption) ({{.ReturnType}}, error) {
+	return s.server.{{.Name}}(ctx, in)
 }
 {{end}}
-func (n *Service) Init(s grpc.ServiceRegistrar) string {
-	{{.ServiceName}}.Client = &{{.ServiceName}}LocalClient{server: n} // 本地直接调
-	{{.ServiceName}}.Register{{.ServiceName | title}}Server(s, n)           // 将服务注册
+func (s *Service) Init(register grpc.ServiceRegistrar) string {
+	{{.ServiceName}}.Client = &{{.ServiceName}}LocalClient{server: s} // 本地直接调
+	{{.ServiceName}}.Register{{.ServiceName | title}}Server(register, s)           // 将服务注册
 	return "{{.ServiceName}}"                              // 服务名称
 }
 `

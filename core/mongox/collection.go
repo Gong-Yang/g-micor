@@ -12,7 +12,6 @@ var collMap = syncx.NewResourceManager[mongo.Collection]()
 
 type CollInterface interface {
 	Create()
-	Update()
 }
 
 type Coll[T CollInterface] struct {
