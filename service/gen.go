@@ -302,6 +302,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+var ModuleName = "{{.ServiceName}}"
+
 type {{.ServiceName}}LocalClient struct {
 	server *Service
 }
