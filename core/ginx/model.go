@@ -38,3 +38,9 @@ func (r ErrorCode) ToRes() Response {
 	}
 	return res
 }
+func NewErr(code, msg string) error {
+	return ErrorCode{
+		Code: code,
+		Msg:  msg,
+	}
+}
