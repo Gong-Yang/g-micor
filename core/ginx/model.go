@@ -42,7 +42,7 @@ func (r ErrorCode) ToRes() Response {
 	}
 	return res
 }
-func NewErr(code, msg, model string) error {
+func NewErr(model, code, msg string) error {
 	return ErrorCode{
 		Model: model,
 		Code:  code,

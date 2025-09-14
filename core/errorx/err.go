@@ -1,3 +1,3 @@
 package errorx
 
-var New func(code, msg string) error
+var New func(model, code, msg string) error
