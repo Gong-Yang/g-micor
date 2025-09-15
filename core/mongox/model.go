@@ -16,7 +16,9 @@ func (b *Base) GetId() any {
 }
 
 func (b *Base) Create() {
-	b.Id = random.Snoyflake()
+	if b.Id == 0 {
+		b.Id = random.Snoyflake()
+	}
 	b.CreateTime = time.Now()
 	b.UpdateTime = time.Now()
 }
