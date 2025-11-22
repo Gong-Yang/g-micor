@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v3.20.3
-// source: core/discover/discover.proto
+// source: g-micor/discover/discover.proto
 
 package discover
 
@@ -155,7 +155,7 @@ var Register_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "core/discover/discover.proto",
+	Metadata: "g-micor/discover/discover.proto",
 }
 
 const (
@@ -295,5 +295,5 @@ var Client_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "core/discover/discover.proto",
+	Metadata: "g-micor/discover/discover.proto",
 }

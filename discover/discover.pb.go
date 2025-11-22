@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.8
 // 	protoc        v3.20.3
-// source: core/discover/discover.proto
+// source: g-micor/discover/discover.proto
 
 package discover
 
@@ -32,7 +32,7 @@ type Req struct {
 
 func (x *Req) Reset() {
 	*x = Req{}
-	mi := &file_core_discover_discover_proto_msgTypes[0]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +44,7 @@ func (x *Req) String() string {
 func (*Req) ProtoMessage() {}
 
 func (x *Req) ProtoReflect() protoreflect.Message {
-	mi := &file_core_discover_discover_proto_msgTypes[0]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +57,7 @@ func (x *Req) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Req.ProtoReflect.Descriptor instead.
 func (*Req) Descriptor() ([]byte, []int) {
-	return file_core_discover_discover_proto_rawDescGZIP(), []int{0}
+	return file_g_micor_discover_discover_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Req) GetPort() string {
@@ -85,7 +85,7 @@ type Resp struct {
 
 func (x *Resp) Reset() {
 	*x = Resp{}
-	mi := &file_core_discover_discover_proto_msgTypes[1]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -97,7 +97,7 @@ func (x *Resp) String() string {
 func (*Resp) ProtoMessage() {}
 
 func (x *Resp) ProtoReflect() protoreflect.Message {
-	mi := &file_core_discover_discover_proto_msgTypes[1]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -110,7 +110,7 @@ func (x *Resp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Resp.ProtoReflect.Descriptor instead.
 func (*Resp) Descriptor() ([]byte, []int) {
-	return file_core_discover_discover_proto_rawDescGZIP(), []int{1}
+	return file_g_micor_discover_discover_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Resp) GetServer() string {
@@ -138,7 +138,7 @@ type RegisterReq struct {
 
 func (x *RegisterReq) Reset() {
 	*x = RegisterReq{}
-	mi := &file_core_discover_discover_proto_msgTypes[2]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -150,7 +150,7 @@ func (x *RegisterReq) String() string {
 func (*RegisterReq) ProtoMessage() {}
 
 func (x *RegisterReq) ProtoReflect() protoreflect.Message {
-	mi := &file_core_discover_discover_proto_msgTypes[2]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -163,7 +163,7 @@ func (x *RegisterReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterReq.ProtoReflect.Descriptor instead.
 func (*RegisterReq) Descriptor() ([]byte, []int) {
-	return file_core_discover_discover_proto_rawDescGZIP(), []int{2}
+	return file_g_micor_discover_discover_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RegisterReq) GetPort() string {
@@ -189,7 +189,7 @@ type RegisterRes struct {
 
 func (x *RegisterRes) Reset() {
 	*x = RegisterRes{}
-	mi := &file_core_discover_discover_proto_msgTypes[3]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -201,7 +201,7 @@ func (x *RegisterRes) String() string {
 func (*RegisterRes) ProtoMessage() {}
 
 func (x *RegisterRes) ProtoReflect() protoreflect.Message {
-	mi := &file_core_discover_discover_proto_msgTypes[3]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -214,7 +214,7 @@ func (x *RegisterRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRes.ProtoReflect.Descriptor instead.
 func (*RegisterRes) Descriptor() ([]byte, []int) {
-	return file_core_discover_discover_proto_rawDescGZIP(), []int{3}
+	return file_g_micor_discover_discover_proto_rawDescGZIP(), []int{3}
 }
 
 // ping 请求
@@ -226,7 +226,7 @@ type PingReq struct {
 
 func (x *PingReq) Reset() {
 	*x = PingReq{}
-	mi := &file_core_discover_discover_proto_msgTypes[4]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -238,7 +238,7 @@ func (x *PingReq) String() string {
 func (*PingReq) ProtoMessage() {}
 
 func (x *PingReq) ProtoReflect() protoreflect.Message {
-	mi := &file_core_discover_discover_proto_msgTypes[4]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -251,7 +251,7 @@ func (x *PingReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingReq.ProtoReflect.Descriptor instead.
 func (*PingReq) Descriptor() ([]byte, []int) {
-	return file_core_discover_discover_proto_rawDescGZIP(), []int{4}
+	return file_g_micor_discover_discover_proto_rawDescGZIP(), []int{4}
 }
 
 // ping 响应
@@ -263,7 +263,7 @@ type PingRes struct {
 
 func (x *PingRes) Reset() {
 	*x = PingRes{}
-	mi := &file_core_discover_discover_proto_msgTypes[5]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -275,7 +275,7 @@ func (x *PingRes) String() string {
 func (*PingRes) ProtoMessage() {}
 
 func (x *PingRes) ProtoReflect() protoreflect.Message {
-	mi := &file_core_discover_discover_proto_msgTypes[5]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -288,7 +288,7 @@ func (x *PingRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingRes.ProtoReflect.Descriptor instead.
 func (*PingRes) Descriptor() ([]byte, []int) {
-	return file_core_discover_discover_proto_rawDescGZIP(), []int{5}
+	return file_g_micor_discover_discover_proto_rawDescGZIP(), []int{5}
 }
 
 // 服务新增通知请求
@@ -303,7 +303,7 @@ type NotifyReq struct {
 
 func (x *NotifyReq) Reset() {
 	*x = NotifyReq{}
-	mi := &file_core_discover_discover_proto_msgTypes[6]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -315,7 +315,7 @@ func (x *NotifyReq) String() string {
 func (*NotifyReq) ProtoMessage() {}
 
 func (x *NotifyReq) ProtoReflect() protoreflect.Message {
-	mi := &file_core_discover_discover_proto_msgTypes[6]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -328,7 +328,7 @@ func (x *NotifyReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NotifyReq.ProtoReflect.Descriptor instead.
 func (*NotifyReq) Descriptor() ([]byte, []int) {
-	return file_core_discover_discover_proto_rawDescGZIP(), []int{6}
+	return file_g_micor_discover_discover_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *NotifyReq) GetType() string {
@@ -361,7 +361,7 @@ type NotifyRes struct {
 
 func (x *NotifyRes) Reset() {
 	*x = NotifyRes{}
-	mi := &file_core_discover_discover_proto_msgTypes[7]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -373,7 +373,7 @@ func (x *NotifyRes) String() string {
 func (*NotifyRes) ProtoMessage() {}
 
 func (x *NotifyRes) ProtoReflect() protoreflect.Message {
-	mi := &file_core_discover_discover_proto_msgTypes[7]
+	mi := &file_g_micor_discover_discover_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -386,14 +386,14 @@ func (x *NotifyRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NotifyRes.ProtoReflect.Descriptor instead.
 func (*NotifyRes) Descriptor() ([]byte, []int) {
-	return file_core_discover_discover_proto_rawDescGZIP(), []int{7}
+	return file_g_micor_discover_discover_proto_rawDescGZIP(), []int{7}
 }
 
-var File_core_discover_discover_proto protoreflect.FileDescriptor
+var File_g_micor_discover_discover_proto protoreflect.FileDescriptor
 
-const file_core_discover_discover_proto_rawDesc = "" +
+const file_g_micor_discover_discover_proto_rawDesc = "" +
 	"\n" +
-	"\x1ccore/discover/discover.proto\x12\bdiscover\"1\n" +
+	"\x1fg-micor/discover/discover.proto\x12\bdiscover\"1\n" +
 	"\x03Req\x12\x12\n" +
 	"\x04port\x18\x01 \x01(\tR\x04port\x12\x16\n" +
 	"\x06server\x18\x02 \x01(\tR\x06server\"2\n" +
@@ -416,22 +416,22 @@ const file_core_discover_discover_proto_rawDesc = "" +
 	"\bDiscover\x12\r.discover.Req\x1a\x0e.discover.Resp\"\x002\x7f\n" +
 	"\x06Client\x12.\n" +
 	"\x04Ping\x12\x11.discover.PingReq\x1a\x11.discover.PingRes\"\x00\x12E\n" +
-	"\x17SubscribeServerRegister\x12\x13.discover.NotifyReq\x1a\x13.discover.NotifyRes\"\x00B,Z*github.com/Gong-Yang/g-micor/discoverb\x06proto3"
+	"\x17SubscribeServerRegister\x12\x13.discover.NotifyReq\x1a\x13.discover.NotifyRes\"\x00B'Z%github.com/Gong-Yang/g-micor/discoverb\x06proto3"
 
 var (
-	file_core_discover_discover_proto_rawDescOnce sync.Once
-	file_core_discover_discover_proto_rawDescData []byte
+	file_g_micor_discover_discover_proto_rawDescOnce sync.Once
+	file_g_micor_discover_discover_proto_rawDescData []byte
 )
 
-func file_core_discover_discover_proto_rawDescGZIP() []byte {
-	file_core_discover_discover_proto_rawDescOnce.Do(func() {
-		file_core_discover_discover_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_core_discover_discover_proto_rawDesc), len(file_core_discover_discover_proto_rawDesc)))
+func file_g_micor_discover_discover_proto_rawDescGZIP() []byte {
+	file_g_micor_discover_discover_proto_rawDescOnce.Do(func() {
+		file_g_micor_discover_discover_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_g_micor_discover_discover_proto_rawDesc), len(file_g_micor_discover_discover_proto_rawDesc)))
 	})
-	return file_core_discover_discover_proto_rawDescData
+	return file_g_micor_discover_discover_proto_rawDescData
 }
 
-var file_core_discover_discover_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
-var file_core_discover_discover_proto_goTypes = []any{
+var file_g_micor_discover_discover_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_g_micor_discover_discover_proto_goTypes = []any{
 	(*Req)(nil),         // 0: discover.Req
 	(*Resp)(nil),        // 1: discover.Resp
 	(*RegisterReq)(nil), // 2: discover.RegisterReq
@@ -441,7 +441,7 @@ var file_core_discover_discover_proto_goTypes = []any{
 	(*NotifyReq)(nil),   // 6: discover.NotifyReq
 	(*NotifyRes)(nil),   // 7: discover.NotifyRes
 }
-var file_core_discover_discover_proto_depIdxs = []int32{
+var file_g_micor_discover_discover_proto_depIdxs = []int32{
 	2, // 0: discover.Register.Register:input_type -> discover.RegisterReq
 	0, // 1: discover.Register.Discover:input_type -> discover.Req
 	4, // 2: discover.Client.Ping:input_type -> discover.PingReq
@@ -457,26 +457,26 @@ var file_core_discover_discover_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_core_discover_discover_proto_init() }
-func file_core_discover_discover_proto_init() {
-	if File_core_discover_discover_proto != nil {
+func init() { file_g_micor_discover_discover_proto_init() }
+func file_g_micor_discover_discover_proto_init() {
+	if File_g_micor_discover_discover_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_core_discover_discover_proto_rawDesc), len(file_core_discover_discover_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_g_micor_discover_discover_proto_rawDesc), len(file_g_micor_discover_discover_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
-		GoTypes:           file_core_discover_discover_proto_goTypes,
-		DependencyIndexes: file_core_discover_discover_proto_depIdxs,
-		MessageInfos:      file_core_discover_discover_proto_msgTypes,
+		GoTypes:           file_g_micor_discover_discover_proto_goTypes,
+		DependencyIndexes: file_g_micor_discover_discover_proto_depIdxs,
+		MessageInfos:      file_g_micor_discover_discover_proto_msgTypes,
 	}.Build()
-	File_core_discover_discover_proto = out.File
-	file_core_discover_discover_proto_goTypes = nil
-	file_core_discover_discover_proto_depIdxs = nil
+	File_g_micor_discover_discover_proto = out.File
+	file_g_micor_discover_discover_proto_goTypes = nil
+	file_g_micor_discover_discover_proto_depIdxs = nil
 }
