@@ -1,5 +1,0 @@
-# 应用配置文件
-
-app:
-  name: notify
-  port: 5000

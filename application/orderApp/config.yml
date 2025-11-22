@@ -1,6 +1,0 @@
-# 应用配置文件
-
-app:
-  name: orderApp
-  port: 5001
-  rpcPort: 4001
