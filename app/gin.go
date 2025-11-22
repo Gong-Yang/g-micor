@@ -2,10 +2,11 @@ package app
 
 import (
 	"fmt"
-	"github.com/Gong-Yang/g-micor/ginx"
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"sync"
+
+	"github.com/Gong-Yang/g-micor/ginx"
+	"github.com/gin-gonic/gin"
 )
 
 func webStart(wg *sync.WaitGroup, service []Module) {
@@ -17,7 +18,6 @@ func webStart(wg *sync.WaitGroup, service []Module) {
 		defer wg.Done()
 		engine := gin.Default()
 		engine.Use(ginx.BasicMiddleware)
-		engine.Use()
 		for _, server := range service {
 			server.Router(engine)
 		}
