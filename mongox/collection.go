@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var collMap = syncx.NewResourceManager[mongo.Collection]()
+var collMap = syncx.NewResourceManager[*mongo.Collection]()
 
 type CollInterface interface {
 	Write(ctx context.Context)

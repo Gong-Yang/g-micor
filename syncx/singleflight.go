@@ -5,7 +5,7 @@ import "sync"
 type (
 	call[T any] struct {
 		wg  sync.WaitGroup
-		val *T
+		val T
 		err error
 	}
 
@@ -22,7 +22,7 @@ func NewSingleFlight[T any]() *SingleFlight[T] {
 	}
 }
 
-func (g *SingleFlight[T]) Do(key string, fn func() (*T, error)) (*T, error) {
+func (g *SingleFlight[T]) Do(key string, fn func() (T, error)) (T, error) {
 	c, done := g.createCall(key)
 	if done {
 		return c.val, c.err
@@ -32,7 +32,7 @@ func (g *SingleFlight[T]) Do(key string, fn func() (*T, error)) (*T, error) {
 	return c.val, c.err
 }
 
-func (g *SingleFlight[T]) DoEx(key string, fn func() (*T, error)) (val any, fresh bool, err error) {
+func (g *SingleFlight[T]) DoEx(key string, fn func() (T, error)) (val any, fresh bool, err error) {
 	c, done := g.createCall(key)
 	if done {
 		return c.val, false, c.err
@@ -58,7 +58,7 @@ func (g *SingleFlight[T]) createCall(key string) (c *call[T], done bool) {
 	return c, false
 }
 
-func (g *SingleFlight[T]) makeCall(c *call[T], key string, fn func() (*T, error)) {
+func (g *SingleFlight[T]) makeCall(c *call[T], key string, fn func() (T, error)) {
 	defer func() {
 		g.lock.Lock()
 		delete(g.calls, key)

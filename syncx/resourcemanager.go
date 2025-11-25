@@ -6,7 +6,7 @@ import (
 
 // A ResourceManager is a manager that used to manage resources.
 type ResourceManager[T any] struct {
-	resources    map[string]*T
+	resources    map[string]T
 	singleFlight *SingleFlight[T]
 	lock         sync.RWMutex
 }
@@ -15,15 +15,15 @@ type ResourceManager[T any] struct {
 func NewResourceManager[T any]() *ResourceManager[T] {
 	flight := NewSingleFlight[T]()
 	return &ResourceManager[T]{
-		resources:    make(map[string]*T),
+		resources:    make(map[string]T),
 		singleFlight: flight,
 	}
 }
 
 // GetResource returns the resource associated with given key.
-func (manager *ResourceManager[T]) GetResource(key string, create func() (*T, error)) (
-	*T, error) {
-	val, err := manager.singleFlight.Do(key, func() (*T, error) {
+func (manager *ResourceManager[T]) GetResource(key string, create func() (T, error)) (
+	res T, err error) {
+	res, err = manager.singleFlight.Do(key, func() (res T, err error) {
 		manager.lock.RLock()
 		resource, ok := manager.resources[key]
 		manager.lock.RUnlock()
@@ -31,9 +31,9 @@ func (manager *ResourceManager[T]) GetResource(key string, create func() (*T, er
 			return resource, nil
 		}
 
-		resource, err := create()
+		res, err = create()
 		if err != nil {
-			return nil, err
+			return
 		}
 
 		manager.lock.Lock()
@@ -43,14 +43,14 @@ func (manager *ResourceManager[T]) GetResource(key string, create func() (*T, er
 		return resource, nil
 	})
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	return val, nil
+	return res, nil
 }
 
 // Inject injects the resource associated with given key.
-func (manager *ResourceManager[T]) Inject(key string, resource *T) {
+func (manager *ResourceManager[T]) Inject(key string, resource T) {
 	manager.lock.Lock()
 	manager.resources[key] = resource
 	manager.lock.Unlock()
