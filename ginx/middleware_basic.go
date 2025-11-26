@@ -89,9 +89,9 @@ func wrapError(ctx *gin.Context, a any, isPanic bool) {
 
 // getStackTrace 获取堆栈跟踪信息
 func getStackTrace() string {
-	buf := make([]byte, 1024)
+	buf := make([]byte, 2048)
 	n := runtime.Stack(buf, false)
-	return string(buf[:n])
+	return string(buf[512:n])
 }
 
 // handleTimeout 处理请求超时控制

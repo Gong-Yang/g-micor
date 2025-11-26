@@ -25,10 +25,10 @@ func (manager *ResourceManager[T]) GetResource(key string, create func() (T, err
 	res T, err error) {
 	res, err = manager.singleFlight.Do(key, func() (res T, err error) {
 		manager.lock.RLock()
-		resource, ok := manager.resources[key]
+		res, ok := manager.resources[key]
 		manager.lock.RUnlock()
 		if ok {
-			return resource, nil
+			return res, nil
 		}
 
 		res, err = create()
@@ -38,9 +38,9 @@ func (manager *ResourceManager[T]) GetResource(key string, create func() (T, err
 
 		manager.lock.Lock()
 		defer manager.lock.Unlock()
-		manager.resources[key] = resource
+		manager.resources[key] = res
 
-		return resource, nil
+		return res, nil
 	})
 	if err != nil {
 		return
