@@ -26,6 +26,7 @@ func GET(group gin.IRouter, conf *RouterConf, path string, fun any, params ...Pa
 	group.GET(path, mid, handler)
 }
 
+// PUT 尽量不用 ， 在渗透测试中PUT请求很危险
 func PUT(group gin.IRouter, conf *RouterConf, path string, fun any, params ...Param) {
 	if conf == nil {
 		panic("conf is nil")
@@ -36,6 +37,7 @@ func PUT(group gin.IRouter, conf *RouterConf, path string, fun any, params ...Pa
 	group.PUT(path, mid, handler)
 }
 
+// DELETE  尽量不用 ， 在渗透测试中DELETE请求很危险
 func DELETE(group gin.IRouter, conf *RouterConf, path string, fun any, params ...Param) {
 	if conf == nil {
 		panic("conf is nil")
