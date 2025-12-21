@@ -76,8 +76,10 @@ func (h *OpenObserveHandler) Handle(ctx context.Context, record slog.Record) err
 		}
 	}
 
-	value := ctx.Value("TraceID")
-	record.AddAttrs(slog.Any("traceID", value))
+	//value := ctx.Value("TraceID")
+	//record.AddAttrs(slog.Any("traceID", value))
+	// 上下文属性
+	recordAddAttrs(ctx, &record)
 
 	// 添加组属性
 	record.Attrs(func(attr slog.Attr) bool {

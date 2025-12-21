@@ -1,6 +1,7 @@
 package ginx
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/gin-gonic/gin"
@@ -56,7 +57,7 @@ func Any(group gin.IRouter, conf *RouterConf, path string, fun any, params ...Pa
 	group.Any(path, mid, handler)
 }
 
-func process(ctx *gin.Context, fun any, params []Param) (res []interface{}) {
+func process(ctx context.Context, ginCtx *gin.Context, fun any, params []Param) (res []interface{}) {
 	// 反射获取反射类型对象
 	funValue := reflect.ValueOf(fun)
 
@@ -65,7 +66,7 @@ func process(ctx *gin.Context, fun any, params []Param) (res []interface{}) {
 	args[0] = reflect.ValueOf(ctx)
 	for i, param := range params {
 		var arg any
-		arg, err := param.GetParam(ctx)
+		arg, err := param.GetParam(ginCtx)
 		if err != nil {
 			panic(err)
 			return
@@ -93,7 +94,7 @@ func checkFun(fun any) {
 
 func getHandler(fun any, params []Param) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
-		resArr := process(ctx, fun, params)
+		resArr := process(ctx.Request.Context(), ctx, fun, params)
 		ctx.Set(ContextFuncResult, resArr)
 	}
 }

@@ -9,6 +9,9 @@ import (
 func LoginUser() *AuthUserParam {
 	return &AuthUserParam{}
 }
+func GinContext() *ginContextParam {
+	return &ginContextParam{}
+}
 
 // AuthUserParam 认证用户
 type AuthUserParam struct{}
@@ -19,6 +22,13 @@ func (a *AuthUserParam) GetParam(ctx *gin.Context) (res any, err error) {
 		return nil, ErrAuthFail
 	}
 	return value, nil
+}
+
+type ginContextParam struct {
+}
+
+func (g ginContextParam) GetParam(ctx *gin.Context) (res any, err error) {
+	return ctx, nil
 }
 
 // Body 参数

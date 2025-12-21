@@ -8,6 +8,7 @@ import (
 	"runtime"
 
 	"github.com/Gong-Yang/g-micor/errorx"
+	"github.com/Gong-Yang/g-micor/logx"
 	"github.com/Gong-Yang/g-micor/util/random"
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +18,7 @@ func BasicMiddleware(ctx *gin.Context) {
 	// 请求追踪号
 	traceID := random.ShortUUID()
 	ctx.Set(ContextTraceID, traceID)
+	logx.RequestAddAttrs(ctx, ContextTraceID, traceID)
 	// 添加panic恢复处理
 	defer handlePanic(ctx)
 	// 执行请求处理链
@@ -35,30 +37,32 @@ func handlePanic(ctx *gin.Context) {
 }
 
 // wrapResponse 统一包装响应
-func wrapResponse(ctx *gin.Context) {
+func wrapResponse(c *gin.Context) {
+	ctx := c.Request.Context()
 	// 如果已经响应则不再处理
-	if ctx.Writer.Written() {
+	if c.Writer.Written() {
 		return
 	}
-	value, exists := ctx.Get(ContextFuncResult)
+	value, exists := c.Get(ContextFuncResult)
 	if !exists {
-		ctx.JSON(http.StatusOK, Response{Code: errorx.RespSuccess})
+		c.JSON(http.StatusOK, Response{Code: errorx.RespSuccess})
 		return
 	}
 	funcResults := value.([]interface{})
 	if len(funcResults) != 2 {
 		slog.ErrorContext(ctx, "invalid func result", "result", funcResults)
-		ctx.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 	if funcResults[1] != nil {
-		wrapError(ctx, funcResults[1], false)
+		wrapError(c, funcResults[1], false)
 		return
 	}
-	ctx.JSON(http.StatusOK, Response{Code: errorx.RespSuccess, Data: funcResults[0]})
+	c.JSON(http.StatusOK, Response{Code: errorx.RespSuccess, Data: funcResults[0]})
 }
 
-func wrapError(ctx *gin.Context, a any, isPanic bool) {
+func wrapError(c *gin.Context, a any, isPanic bool) {
+	ctx := c.Request.Context()
 	appErr, ok := a.(errorx.ErrorCode)
 	if !ok {
 		stackTrace := getStackTrace()
@@ -67,14 +71,14 @@ func wrapError(ctx *gin.Context, a any, isPanic bool) {
 			slog.ErrorContext(ctx, "panic",
 				"err", a,
 				"stack", stackTrace,
-				"path", ctx.Request.URL.Path)
-			ctx.AbortWithStatus(http.StatusInternalServerError)
+				"path", c.Request.URL.Path)
+			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		} else {
 			slog.WarnContext(ctx, "sysError",
 				"err", a,
 				"stack", stackTrace,
-				"path", ctx.Request.URL.Path)
+				"path", c.Request.URL.Path)
 			appErr = errorx.ErrorCode{Code: errorx.RespErr, Msg: "请联系管理员"}
 		}
 	}
@@ -83,8 +87,8 @@ func wrapError(ctx *gin.Context, a any, isPanic bool) {
 	slog.InfoContext(ctx, "business err response",
 		"err", appErr,
 		"response", appErr,
-		"path", ctx.Request.URL.Path)
-	ctx.AbortWithStatusJSON(http.StatusOK, appErr)
+		"path", c.Request.URL.Path)
+	c.AbortWithStatusJSON(http.StatusOK, appErr)
 }
 
 // getStackTrace 获取堆栈跟踪信息
@@ -107,7 +111,7 @@ func handleTimeout(ctx *gin.Context, conf *RouterConf) (cancel func()) {
 		<-reqCtx.Done()
 		//slog.InfoContext(ctx, "reqCtx done", "path", ctx.FullPath(), "err", reqCtx.Err())
 		if errors.Is(reqCtx.Err(), context.DeadlineExceeded) {
-			slog.ErrorContext(ctx, "request timeout",
+			slog.ErrorContext(reqCtx, "request timeout",
 				"path", ctx.FullPath(),
 				"method", ctx.Request.Method,
 				"timeout_seconds", conf.timeOut.Seconds())
