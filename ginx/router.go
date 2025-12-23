@@ -4,7 +4,7 @@ package ginx
 func OpenRouter() *RouterConf {
 	return &RouterConf{
 		timeOut:   DefaultTimeOut,
-		sinWay:    "",
+		sinWay:    "Normal",
 		needLogin: false,
 	}
 }
