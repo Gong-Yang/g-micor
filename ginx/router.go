@@ -4,7 +4,7 @@ package ginx
 func OpenRouter() *RouterConf {
 	return &RouterConf{
 		timeOut:   DefaultTimeOut,
-		sinWay:    SignWayNormal,
+		sinWay:    "",
 		needLogin: false,
 	}
 }
@@ -12,7 +12,7 @@ func OpenRouter() *RouterConf {
 func LoginRouter(appid string, author Author) *RouterConf {
 	return &RouterConf{
 		timeOut:   DefaultTimeOut,
-		sinWay:    SignWayNormal,
+		sinWay:    "",
 		needLogin: true,
 		appId:     appid,
 		author:    author,

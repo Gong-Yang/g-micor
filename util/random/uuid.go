@@ -1,8 +1,9 @@
 package random
 
 import (
-	"github.com/google/uuid"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // 定义可用于编码的字符集 - 包含数字、大小写字母和一些安全的特殊字符

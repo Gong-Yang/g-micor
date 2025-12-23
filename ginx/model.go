@@ -32,6 +32,7 @@ func (r *RouterConf) GetMiddleware() func(ctx *gin.Context) {
 	}
 	r.middleware = func(ctx *gin.Context) {
 		// TODO 接口验签
+
 		// TODO 接口鉴权
 		_, err := handAuth(ctx, r)
 		if err != nil {
@@ -46,6 +47,11 @@ func (r *RouterConf) GetMiddleware() func(ctx *gin.Context) {
 		//slog.InfoContext(ctx, "request done", "path", ctx.FullPath())
 	}
 	return r.middleware
+}
+func (r *RouterConf) NormalSing() *RouterConf {
+	rcopy := *r
+	rcopy.sinWay = "Normal"
+	return &rcopy
 }
 
 // Author 鉴权者

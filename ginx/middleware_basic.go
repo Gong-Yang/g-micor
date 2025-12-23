@@ -140,6 +140,6 @@ func handAuth(ctx *gin.Context, conf *RouterConf) (AuthUser, error) {
 		return nil, ErrAuthFail
 	}
 
-	ctx.Set(ContextAuthUser, user)
+	GinCtxSet(ctx, ContextAuthUser, user)
 	return user, nil
 }
