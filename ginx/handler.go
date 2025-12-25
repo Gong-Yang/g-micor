@@ -7,56 +7,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func POST(group gin.IRouter, conf *RouterConf, path string, fun any, params ...Param) {
-	if conf == nil {
-		panic("conf is nil")
-	}
+func POST(group gin.IRouter, mid []HandlerFunc, path string, fun any, params ...Param) {
 	checkFun(fun)
-	mid := conf.GetMiddleware()
 	var handler = getHandler(fun, params)
-	group.POST(path, mid, handler)
+	group.POST(path, append(handlerConvert(mid), handler)...)
 }
-func GET(group gin.IRouter, conf *RouterConf, path string, fun any, params ...Param) {
-	if conf == nil {
-		panic("conf is nil")
-	}
+func GET(group gin.IRouter, mid []HandlerFunc, path string, fun any, params ...Param) {
 	checkFun(fun)
-	mid := conf.GetMiddleware()
 	var handler = getHandler(fun, params)
-	group.GET(path, mid, handler)
+	group.GET(path, append(handlerConvert(mid), handler)...)
 }
 
-// PUT 尽量不用 ， 在渗透测试中PUT请求很危险
-func PUT(group gin.IRouter, conf *RouterConf, path string, fun any, params ...Param) {
-	if conf == nil {
-		panic("conf is nil")
-	}
-	checkFun(fun)
-	mid := conf.GetMiddleware()
-	var handler = getHandler(fun, params)
-	group.PUT(path, mid, handler)
-}
-
-// DELETE  尽量不用 ， 在渗透测试中DELETE请求很危险
-func DELETE(group gin.IRouter, conf *RouterConf, path string, fun any, params ...Param) {
-	if conf == nil {
-		panic("conf is nil")
-	}
-	checkFun(fun)
-	mid := conf.GetMiddleware()
-	var handler = getHandler(fun, params)
-	group.DELETE(path, mid, handler)
-}
-
-func Any(group gin.IRouter, conf *RouterConf, path string, fun any, params ...Param) {
-	if conf == nil {
-		panic("conf is nil")
-	}
+func Any(group gin.IRouter, mid []HandlerFunc, path string, fun any, params ...Param) {
 	// 检查 fun 是否是可调用的
 	checkFun(fun)
-	mid := conf.GetMiddleware()
 	var handler = getHandler(fun, params)
-	group.Any(path, mid, handler)
+	group.Any(path, append(handlerConvert(mid), handler)...)
 }
 
 func process(ctx context.Context, ginCtx *gin.Context, fun any, params []Param) (res []interface{}) {

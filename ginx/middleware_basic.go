@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime"
+	"time"
 
 	"github.com/Gong-Yang/g-micor/errorx"
 	"github.com/Gong-Yang/g-micor/logx"
@@ -98,48 +99,73 @@ func getStackTrace() string {
 	return string(buf[512:n])
 }
 
-// handleTimeout 处理请求超时控制
-func handleTimeout(ctx *gin.Context, conf *RouterConf) (cancel func()) {
-	// 创建带超时的上下文
-	reqCtx, cancel := context.WithTimeout(ctx.Request.Context(), conf.timeOut)
+var timeOutMap = map[int]HandlerFunc{}
 
-	// 将超时上下文替换到请求中
-	ctx.Request = ctx.Request.WithContext(reqCtx)
+// MidTimeOut 处理请求超时控制
+func MidTimeOut(seconds int) HandlerFunc {
+	if hand, ok := timeOutMap[seconds]; ok {
+		return hand
+	}
+	hand := func(ctx *gin.Context) error {
+		// 创建带超时的上下文
+		reqCtx, cancel := context.WithTimeout(ctx.Request.Context(), time.Second*time.Duration(seconds))
 
-	// 使用 goroutine 监控超时，但不阻塞主流程
-	go func() {
-		<-reqCtx.Done()
-		//slog.InfoContext(ctx, "reqCtx done", "path", ctx.FullPath(), "err", reqCtx.Err())
-		if errors.Is(reqCtx.Err(), context.DeadlineExceeded) {
-			slog.ErrorContext(reqCtx, "request timeout",
-				"path", ctx.FullPath(),
-				"method", ctx.Request.Method,
-				"timeout_seconds", conf.timeOut.Seconds())
-			// 注意：这里的 AbortWithStatus 可能在请求已完成后调用
-			// 但 Gin 会自动处理这种情况
-			ctx.AbortWithStatus(http.StatusGatewayTimeout)
+		// 将超时上下文替换到请求中
+		ctx.Request = ctx.Request.WithContext(reqCtx)
+
+		// 使用 goroutine 监控超时，但不阻塞主流程
+		go func() {
+			<-reqCtx.Done()
+			//slog.InfoContext(ctx, "reqCtx done", "path", ctx.FullPath(), "err", reqCtx.Err())
+			if errors.Is(reqCtx.Err(), context.DeadlineExceeded) {
+				slog.ErrorContext(reqCtx, "request timeout",
+					"path", ctx.FullPath(),
+					"method", ctx.Request.Method,
+					"timeout_seconds", seconds)
+				// 注意：这里的 AbortWithStatus 可能在请求已完成后调用
+				// 但 Gin 会自动处理这种情况
+				ctx.AbortWithStatus(http.StatusGatewayTimeout)
+			}
+		}()
+		defer cancel()
+		ctx.Next()
+		return nil
+	}
+	timeOutMap[seconds] = hand
+	return hand
+}
+
+type HandlerFunc func(ctx *gin.Context) error
+
+func handlerConvert(in []HandlerFunc) (res []gin.HandlerFunc) {
+	res = make([]gin.HandlerFunc, len(in))
+	for i, handlerFunc := range in {
+		res[i] = func(ctx *gin.Context) {
+			if err := handlerFunc(ctx); err != nil {
+				wrapError(ctx, err, false)
+			}
 		}
-	}()
+	}
 	return
 }
 
-func handAuth(ctx *gin.Context, conf *RouterConf) (AuthUser, error) {
-	if conf.author == nil { // 无认证者
-		return nil, nil
-	}
-
-	user, err := conf.author.Auth(conf.appId, ctx)
-	if err != nil {
-		if conf.needLogin {
-			return nil, err // 需要登录
-		}
-		return nil, nil
-	}
-
-	if conf.role != "" && user.GetRole() != conf.role {
-		return nil, ErrAuthFail
-	}
-
-	GinCtxSet(ctx, ContextAuthUser, user)
-	return user, nil
-}
+//func handAuth(ctx *gin.Context, conf *RouterConf) (AuthUser, error) {
+//	if conf.author == nil { // 无认证者
+//		return nil, nil
+//	}
+//
+//	user, err := conf.author.Auth(conf.appId, ctx)
+//	if err != nil {
+//		if conf.needLogin {
+//			return nil, err // 需要登录
+//		}
+//		return nil, nil
+//	}
+//
+//	if conf.role != "" && user.GetRole() != conf.role {
+//		return nil, ErrAuthFail
+//	}
+//
+//	GinCtxSet(ctx, ContextAuthUser, user)
+//	return user, nil
+//}
