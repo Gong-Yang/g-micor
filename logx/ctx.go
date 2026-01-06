@@ -12,11 +12,11 @@ func RequestAddAttrs(ctx *gin.Context, key string, value any) {
 	ctx.Request = ctx.Request.WithContext(res)
 }
 
-var logAttrsKey = "logAttrs"
+var LogAttrsKey = "logAttrs"
 
 func AddAttrs(ctx context.Context, key string, value any) (res context.Context) {
 	// 从标准 context 中获取现有属性
-	raw := ctx.Value(logAttrsKey)
+	raw := ctx.Value(LogAttrsKey)
 	var attrs map[string]any
 	if raw == nil {
 		attrs = make(map[string]any)
@@ -29,10 +29,10 @@ func AddAttrs(ctx context.Context, key string, value any) (res context.Context) 
 		}
 	}
 	attrs[key] = value
-	return context.WithValue(ctx, logAttrsKey, attrs)
+	return context.WithValue(ctx, LogAttrsKey, attrs)
 }
 func recordAddAttrs(ctx context.Context, record *slog.Record) {
-	value := ctx.Value(logAttrsKey)
+	value := ctx.Value(LogAttrsKey)
 	if value == nil {
 		return
 	}
