@@ -20,6 +20,7 @@ func Init(consumerName string, opt *redis.Options) {
 	}
 	slog.Info("Redis连接成功")
 	ConsumerName = consumerName
+	InitSingleFlight()
 }
 
 var initList []Initialize
