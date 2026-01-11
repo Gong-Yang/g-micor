@@ -2,11 +2,13 @@ package mongox
 
 import "go.mongodb.org/mongo-driver/bson"
 
-type UpdateBuilder[T any] []*UpdateInfo
+type UpdateBuilder[T any] struct {
+	Update []*UpdateInfo `json:"update,omitempty"`
+}
 type UpdateInfo struct {
-	Key       string // 操作Key,通过 “.” 分割
-	Value     string // 操作值，固定提供字符串
-	Operation string // 操作方式 $set $unset $rename $push
+	Key       string `json:"key,omitempty"`       // 操作Key,通过 “.” 分割
+	Value     string `json:"value,omitempty"`     // 操作值，固定提供字符串
+	Operation string `json:"operation,omitempty"` // 操作方式 $set $unset $rename $push
 }
 
 func (u UpdateBuilder[T]) ToUpdate() bson.M {
@@ -14,7 +16,6 @@ func (u UpdateBuilder[T]) ToUpdate() bson.M {
 		t   T
 		res bson.M
 	)
-	for _, info := range u {
-		//
-	}
+	// 检测key合法
+
 }
