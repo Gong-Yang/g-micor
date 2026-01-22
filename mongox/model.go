@@ -4,15 +4,15 @@ import (
 	"context"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 const ContextTenantId = "tenantId"
 
 type Base struct {
-	Id         primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	TenantId   string             `bson:"tenantId,omitempty" json:"tenantId,omitempty"`
-	UpdateTime time.Time          `bson:"updateTime" json:"updateTime"`
+	Id         bson.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	TenantId   string        `bson:"tenantId,omitempty" json:"tenantId,omitempty"`
+	UpdateTime time.Time     `bson:"updateTime" json:"updateTime"`
 }
 
 func (b *Base) GetId() any {
@@ -21,7 +21,7 @@ func (b *Base) GetId() any {
 
 func (b *Base) Write(ctx context.Context) {
 	if b.Id.IsZero() {
-		b.Id = primitive.NewObjectID()
+		b.Id = bson.NewObjectID()
 	}
 	b.UpdateTime = time.Now()
 	if b.TenantId == "" {

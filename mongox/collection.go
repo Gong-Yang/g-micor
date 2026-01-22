@@ -5,9 +5,9 @@ import (
 	"log/slog"
 
 	"github.com/Gong-Yang/g-micor/syncx"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 var collMap = syncx.NewResourceManager[*mongo.Collection]()
@@ -24,20 +24,20 @@ type Coll[T CollInterface] struct {
 }
 
 func (t *Coll[T]) FindOne(ctx context.Context, filter interface{},
-	opts ...*options.FindOneOptions) (res *T, err error) {
+	opts ...options.Lister[options.FindOneOptions]) (res *T, err error) {
 	coll := getColl(ctx, t)
 	err = coll.FindOne(ctx, filter, opts...).Decode(&res)
 	return
 }
 
 func (t *Coll[T]) FindById(ctx context.Context, id interface{},
-	opts ...*options.FindOneOptions) (res *T, err error) {
+	opts ...options.Lister[options.FindOneOptions]) (res *T, err error) {
 	coll := getColl(ctx, t)
 	err = coll.FindOne(ctx, bson.M{"_id": id}, opts...).Decode(&res)
 	return
 }
 func (t *Coll[T]) Find(ctx context.Context, filter interface{},
-	opts ...*options.FindOptions) (res []*T, err error) {
+	opts ...options.Lister[options.FindOptions]) (res []*T, err error) {
 	coll := getColl(ctx, t)
 	cur, err := coll.Find(ctx, filter, opts...)
 	if err != nil {
@@ -48,7 +48,7 @@ func (t *Coll[T]) Find(ctx context.Context, filter interface{},
 }
 
 func (t *Coll[T]) InsertOne(ctx context.Context, document interface{},
-	opts ...*options.InsertOneOptions) (*mongo.InsertOneResult, error) {
+	opts ...options.Lister[options.InsertOneOptions]) (*mongo.InsertOneResult, error) {
 	coll := getColl(ctx, t)
 	if c, ok := document.(CollInterface); ok {
 		c.Write(ctx)
@@ -56,7 +56,7 @@ func (t *Coll[T]) InsertOne(ctx context.Context, document interface{},
 	return coll.InsertOne(ctx, document, opts...)
 }
 func (t *Coll[T]) InsertMany(ctx context.Context, documents []CollInterface,
-	opts ...*options.InsertManyOptions) (*mongo.InsertManyResult, error) {
+	opts ...options.Lister[options.InsertManyOptions]) (*mongo.InsertManyResult, error) {
 	coll := getColl(ctx, t)
 	res := make([]interface{}, len(documents))
 	for i, document := range documents {
@@ -65,12 +65,12 @@ func (t *Coll[T]) InsertMany(ctx context.Context, documents []CollInterface,
 	}
 	return coll.InsertMany(ctx, res, opts...)
 }
-func (t *Coll[T]) UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+func (t *Coll[T]) UpdateOne(ctx context.Context, filter interface{}, update interface{}, opts ...options.Lister[options.UpdateOneOptions]) (*mongo.UpdateResult, error) {
 	coll := getColl(ctx, t)
-	return coll.UpdateOne(ctx, filter, update)
+	return coll.UpdateOne(ctx, filter, update, opts...)
 }
 func (t *Coll[T]) BulkWrite(ctx context.Context, models []mongo.WriteModel,
-	opts ...*options.BulkWriteOptions) (*mongo.BulkWriteResult, error) {
+	opts ...options.Lister[options.BulkWriteOptions]) (*mongo.BulkWriteResult, error) {
 	coll := getColl(ctx, t)
 	return coll.BulkWrite(ctx, models, opts...)
 }

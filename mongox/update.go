@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var opFun = map[string]func(ctx context.Context, t any, key string, value any, res bson.M) error{

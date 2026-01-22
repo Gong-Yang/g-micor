@@ -1,6 +1,6 @@
 package mongox
 
-import "go.mongodb.org/mongo-driver/bson"
+import "go.mongodb.org/mongo-driver/v2/bson"
 
 type Filter bson.M
 
