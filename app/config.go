@@ -46,6 +46,7 @@ type OpenObserveConfig struct {
 }
 
 type AIConfig struct {
-	ApiKey  string `yaml:"apiKey"`
-	BaseUrl string `yaml:"baseUrl"`
+	ApiKey       string `yaml:"apiKey"`
+	BaseUrl      string `yaml:"baseUrl"`
+	EmbeddingUrl string `yaml:"embeddingUrl"`
 }
