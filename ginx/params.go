@@ -6,6 +6,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func FormFile(name string) *FormFileParam {
+	return &FormFileParam{name: name}
+}
+
+type FormFileParam struct {
+	name string
+}
+
+func (f *FormFileParam) GetParam(ctx *gin.Context) (res any, err error) {
+	file, err := ctx.FormFile(f.name)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
 // Body 参数
 func Body[T any]() *BodyParam[T] {
 	return &BodyParam[T]{}

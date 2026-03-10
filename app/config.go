@@ -9,6 +9,7 @@ type Config struct {
 	Mail    MailConfig
 	Observe OpenObserveConfig
 	AI      AIConfig
+	PicGo   PicGoConfig
 }
 
 type AppConfig struct {
@@ -49,4 +50,10 @@ type AIConfig struct {
 	ApiKey       string `yaml:"apiKey"`
 	BaseUrl      string `yaml:"baseUrl"`
 	EmbeddingUrl string `yaml:"embeddingUrl"`
+}
+
+type PicGoConfig struct {
+	ApiKey     string `yaml:"apiKey"`
+	BaseUrl    string `yaml:"baseUrl"`
+	Expiration string `yaml:"expiration"` // 有效期格式：P1W (1 周), P1D (1 天), P1M (1 月)
 }
