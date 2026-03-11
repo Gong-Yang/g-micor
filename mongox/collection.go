@@ -47,7 +47,7 @@ func (t *Coll[T]) Find(ctx context.Context, filter interface{},
 	return
 }
 func (t *Coll[T]) Aggregate(ctx context.Context, pipeline []bson.M, res any,
-	opts ...*options.AggregateOptions) (err error) {
+	opts ...options.Lister[options.AggregateOptions]) (err error) {
 	coll := getColl(ctx, t)
 	aggregate, err := coll.Aggregate(ctx, pipeline, opts...)
 	if err != nil {
