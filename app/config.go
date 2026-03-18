@@ -10,6 +10,7 @@ type Config struct {
 	Observe OpenObserveConfig
 	AI      AIConfig
 	PicGo   PicGoConfig
+	OSS     OSSConfig
 }
 
 type AppConfig struct {
@@ -50,6 +51,13 @@ type AIConfig struct {
 	ApiKey       string `yaml:"apiKey"`
 	BaseUrl      string `yaml:"baseUrl"`
 	EmbeddingUrl string `yaml:"embeddingUrl"`
+}
+
+type OSSConfig struct {
+	AccessKeyID     string `yaml:"accessKeyID"`
+	AccessKeySecret string `yaml:"accessKeySecret"`
+	BucketName      string `yaml:"bucketName"`
+	Endpoint        string `yaml:"endpoint"`
 }
 
 type PicGoConfig struct {
