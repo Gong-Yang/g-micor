@@ -58,6 +58,7 @@ type OSSConfig struct {
 	AccessKeySecret string `yaml:"accessKeySecret"`
 	BucketName      string `yaml:"bucketName"`
 	Endpoint        string `yaml:"endpoint"`
+	UrlEndpoint     string `yaml:"urlEndpoint"`
 }
 
 type PicGoConfig struct {
