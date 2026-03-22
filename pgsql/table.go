@@ -301,18 +301,11 @@ type ptrScanSlot struct {
 func (s ptrScanSlot) apply(val reflect.Value) error {
 	fieldVal := val.Field(s.fieldIndex)
 
-	if fieldVal.Kind() == reflect.Ptr {
-		if fieldVal.IsNil() {
-			fieldVal.Set(reflect.New(fieldVal.Type().Elem()))
-		}
-		fieldVal = fieldVal.Elem()
-	}
-
 	switch s.kind {
 	case scanPtrString:
 		ns := s.target.(*sql.NullString)
 		if !ns.Valid {
-			fieldVal.SetZero()
+			fieldVal.Set(reflect.Zero(fieldVal.Type()))
 			return nil
 		}
 		p := reflect.New(s.elemType)
@@ -322,7 +315,7 @@ func (s ptrScanSlot) apply(val reflect.Value) error {
 	case scanPtrBool:
 		nb := s.target.(*sql.NullBool)
 		if !nb.Valid {
-			fieldVal.SetZero()
+			fieldVal.Set(reflect.Zero(fieldVal.Type()))
 			return nil
 		}
 		p := reflect.New(s.elemType)
@@ -332,7 +325,7 @@ func (s ptrScanSlot) apply(val reflect.Value) error {
 	case scanPtrInt:
 		ni := s.target.(*sql.NullInt64)
 		if !ni.Valid {
-			fieldVal.SetZero()
+			fieldVal.Set(reflect.Zero(fieldVal.Type()))
 			return nil
 		}
 		p := reflect.New(s.elemType)
@@ -342,7 +335,7 @@ func (s ptrScanSlot) apply(val reflect.Value) error {
 	case scanPtrUint:
 		ni := s.target.(*sql.NullInt64)
 		if !ni.Valid {
-			fieldVal.SetZero()
+			fieldVal.Set(reflect.Zero(fieldVal.Type()))
 			return nil
 		}
 		if ni.Int64 < 0 {
@@ -355,13 +348,12 @@ func (s ptrScanSlot) apply(val reflect.Value) error {
 	case scanPtrFloat:
 		nf := s.target.(*sql.NullFloat64)
 		if !nf.Valid {
-			fieldVal.SetZero()
+			fieldVal.Set(reflect.Zero(fieldVal.Type()))
 			return nil
 		}
 		p := reflect.New(s.elemType)
 		p.Elem().SetFloat(nf.Float64)
 		fieldVal.Set(p)
-
 	default:
 		return nil
 	}

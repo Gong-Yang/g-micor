@@ -15,7 +15,8 @@ func main() {
 		panic(err)
 	}
 	//user := &User{Name: "John Doe", Email: "john.doe@example.com", Age: 30}
-	user := &User{Name: "John3", Email: "john5@example.com", Age: 31, CreatedAt: time.Now(),
+	name := "John8"
+	user := &User{Name: &name, Email: "john5@example.com", Age: 31, CreatedAt: time.Now(),
 		Address: &Address{
 			Street: "gg",
 			Number: 6,
@@ -25,7 +26,7 @@ func main() {
 		panic(err)
 	}
 	println(user.ID)
-	res, err := UserStore.FindById(context.Background(), user.ID)
+	res, err := UserStore.FindByID(context.Background(), user.ID)
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +44,7 @@ func main() {
 
 type User struct {
 	ID        int64     `db:"id" json:"id,omitempty"`
-	Name      string    `db:"name" json:"name,omitempty"`
+	Name      *string   `db:"name" json:"name,omitempty"`
 	Email     string    `db:"email" json:"email,omitempty"`
 	Age       int32     `db:"age" json:"age,omitempty"`
 	CreatedAt time.Time `db:"created_at" json:"createdAt"`
