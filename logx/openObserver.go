@@ -201,6 +201,13 @@ func (h *OpenObserveHandler) sendBatch(ctx context.Context, logEntries []map[str
 		//println("len(logEntries) == 0")
 		return nil
 	}
+	for _, entry := range logEntries {
+		for key, value := range entry {
+			if err, isError := value.(error); isError {
+				entry[key] = err.Error()
+			}
+		}
+	}
 
 	// 构建请求URL
 	url := fmt.Sprintf("%s/api/%s/%s/_json", h.opts.Endpoint, h.opts.Organization, h.opts.Stream)
