@@ -50,11 +50,11 @@ type Table[T DBEntity] struct {
 }
 
 var (
-	tableStore   = syncx.NewResourceManager[any]()
-	timeType     = reflect.TypeOf(time.Time{})
-	valuerType   = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
-	scannerType  = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
-	rawBytesType = reflect.TypeOf(sql.RawBytes{})
+	tableStore  = syncx.NewResourceManager[any]()
+	timeType    = reflect.TypeOf(time.Time{})
+	valuerType  = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
+	scannerType = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
+	// rawBytesType 已移除：sql.RawBytes 是 []byte（Kind=Slice），不会进 Struct 分支
 )
 
 func GetTable[T DBEntity]() *Table[T] {
@@ -64,7 +64,10 @@ func GetTable[T DBEntity]() *Table[T] {
 		panic("T must be a struct")
 	}
 
-	tableObj, err := tableStore.GetResource(tType.String(), func() (any, error) {
+	// 修复 #13：用完整包路径作为缓存 key，防止跨包同名 struct 冲突
+	cacheKey := tType.PkgPath() + "." + tType.Name()
+
+	tableObj, err := tableStore.GetResource(cacheKey, func() (any, error) {
 		var (
 			fields       []*fieldMeta
 			insertFields []*fieldMeta
@@ -72,7 +75,6 @@ func GetTable[T DBEntity]() *Table[T] {
 			placeholders []string
 			allColumns   []string
 			pkField      *fieldMeta
-			findId       bool
 		)
 
 		for i := 0; i < tType.NumField(); i++ {
@@ -107,7 +109,6 @@ func GetTable[T DBEntity]() *Table[T] {
 			fields = append(fields, meta)
 
 			if meta.IsPrimaryKey {
-				findId = true
 				if field.Type.Kind() != reflect.Int64 {
 					return nil, fmt.Errorf("db id must be int64")
 				}
@@ -120,11 +121,9 @@ func GetTable[T DBEntity]() *Table[T] {
 			placeholders = append(placeholders, fmt.Sprintf("$%d", len(columns)))
 		}
 
-		if !findId {
-			return nil, fmt.Errorf("table %s must have an id field", tType.Name())
-		}
+		// 修复 #6：只保留一个检查
 		if pkField == nil {
-			return nil, fmt.Errorf("table %s missing primary key metadata", tType.Name())
+			return nil, fmt.Errorf("table %s must have an id field", tType.Name())
 		}
 
 		tableName := t.TableName()
@@ -357,34 +356,33 @@ func (s ptrScanSlot) apply(val reflect.Value) error {
 		p := reflect.New(s.elemType)
 		p.Elem().SetFloat(nf.Float64)
 		fieldVal.Set(p)
-	default:
-		return nil
 	}
 
 	return nil
 }
 
 func classifyScanKind(fieldType reflect.Type) (fieldScanKind, reflect.Type) {
-	original := fieldType
-
 	// *T
 	if fieldType.Kind() == reflect.Ptr {
 		elem := fieldType.Elem()
 
-		// *struct：尽量走 JSON / Scanner / Valuer
+		// *struct
 		if elem.Kind() == reflect.Struct {
 			if elem == timeType {
 				return scanDirect, nil
 			}
-			if original.Implements(scannerType) || original.Implements(valuerType) {
+			// 修复 #7：先查 *T（指针接收者），再查 T（值接收者）
+			if fieldType.Implements(scannerType) || fieldType.Implements(valuerType) {
 				return scanDirect, nil
 			}
-			if reflect.PointerTo(elem).Implements(scannerType) || reflect.PointerTo(elem).Implements(valuerType) {
+			if elem.Implements(scannerType) || elem.Implements(valuerType) {
 				return scanDirect, nil
 			}
-			if elem == rawBytesType {
-				return scanDirect, nil
-			}
+			return scanJSON, nil
+		}
+
+		// *slice, *map → JSON
+		if elem.Kind() == reflect.Slice || elem.Kind() == reflect.Map {
 			return scanJSON, nil
 		}
 
@@ -410,52 +408,84 @@ func classifyScanKind(fieldType reflect.Type) (fieldScanKind, reflect.Type) {
 		if fieldType == timeType {
 			return scanDirect, nil
 		}
-		if original.Implements(scannerType) || original.Implements(valuerType) {
+		// 值接收者
+		if fieldType.Implements(scannerType) || fieldType.Implements(valuerType) {
 			return scanDirect, nil
 		}
+		// 指针接收者
 		if reflect.PointerTo(fieldType).Implements(scannerType) || reflect.PointerTo(fieldType).Implements(valuerType) {
-			return scanDirect, nil
-		}
-		if fieldType == rawBytesType {
 			return scanDirect, nil
 		}
 		return scanJSON, nil
 	}
 
-	// 普通基础类型 / 自定义命名类型
+	// 修复 #8：Slice / Map → JSON（[]byte 除外）
+	if fieldType.Kind() == reflect.Slice {
+		if fieldType == reflect.TypeOf([]byte(nil)) {
+			return scanDirect, nil
+		}
+		return scanJSON, nil
+	}
+	if fieldType.Kind() == reflect.Map {
+		return scanJSON, nil
+	}
+
+	// 普通基础类型
 	return scanDirect, nil
 }
 
-// getValue 获取字段值，处理指针、时间、JSONB 等类型
-func getValue(fieldValue reflect.Value) (goValue any, err error) {
-	for {
-		if fieldValue.Kind() != reflect.Ptr {
-			break
-		}
+func getValue(fieldValue reflect.Value) (any, error) {
+	// 指针解引用，解引用前先检查 Valuer
+	for fieldValue.Kind() == reflect.Ptr {
 		if fieldValue.IsNil() {
 			return nil, nil
 		}
+		// 修复 #4：指针接收者的 Valuer 在解引用前捕获
 		if fieldValue.Type().Implements(valuerType) {
-			return fieldValue.Interface().(driver.Valuer).Value(), nil
+			return fieldValue.Interface().(driver.Valuer).Value() // 修复：不要多加 nil
 		}
 		fieldValue = fieldValue.Elem()
-		continue
 	}
 
-	if fieldValue.Type() == timeType {
-		valueI := fieldValue.Interface()
-		value, _ := valueI.(time.Time)
-		if value.IsZero() {
-			return nil, nil
+	// 修复：非指针字段，检查指针接收者的 Valuer（如 func (s *MyType) Value()）
+	if fieldValue.CanAddr() {
+		if valuer, ok := fieldValue.Addr().Interface().(driver.Valuer); ok {
+			return valuer.Value()
 		}
-		return valueI, nil
 	}
 
+	// 值接收者的 Valuer
 	if valuer, ok := fieldValue.Interface().(driver.Valuer); ok {
 		return valuer.Value()
 	}
 
+	// time.Time 特殊处理
+	if fieldValue.Type() == timeType {
+		t := fieldValue.Interface().(time.Time)
+		if t.IsZero() {
+			return nil, nil
+		}
+		return t, nil
+	}
+
+	// struct → JSON
 	if fieldValue.Kind() == reflect.Struct {
+		jsonData, err := json.Marshal(fieldValue.Interface())
+		if err != nil {
+			return nil, fmt.Errorf("json marshal error: %w", err)
+		}
+		return jsonData, nil
+	}
+
+	// 修复 #8：slice / map → JSON
+	if fieldValue.Kind() == reflect.Slice || fieldValue.Kind() == reflect.Map {
+		if fieldValue.IsNil() {
+			return nil, nil
+		}
+		// []byte 直接传
+		if fieldValue.Type() == reflect.TypeOf([]byte(nil)) {
+			return fieldValue.Interface(), nil
+		}
 		jsonData, err := json.Marshal(fieldValue.Interface())
 		if err != nil {
 			return nil, fmt.Errorf("json marshal error: %w", err)
