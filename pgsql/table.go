@@ -64,7 +64,7 @@ func GetTable[T DBEntity]() *Table[T] {
 		panic("T must be a struct")
 	}
 
-	tableObj, _ := tableStore.GetResource(tType.String(), func() (any, error) {
+	tableObj, err := tableStore.GetResource(tType.String(), func() (any, error) {
 		var (
 			fields       []*fieldMeta
 			insertFields []*fieldMeta
@@ -146,7 +146,10 @@ func GetTable[T DBEntity]() *Table[T] {
 			),
 		}, nil
 	})
-
+	if err != nil {
+		slog.ErrorContext(context.Background(), "get table error", "err", err)
+		panic(err)
+	}
 	return tableObj.(*Table[T])
 }
 
@@ -431,6 +434,9 @@ func getValue(fieldValue reflect.Value) (goValue any, err error) {
 		}
 		if fieldValue.IsNil() {
 			return nil, nil
+		}
+		if fieldValue.Type().Implements(valuerType) {
+			return fieldValue.Interface().(driver.Valuer).Value(), nil
 		}
 		fieldValue = fieldValue.Elem()
 		continue
