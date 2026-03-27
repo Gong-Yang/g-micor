@@ -49,12 +49,102 @@ type Table[T DBEntity] struct {
 	selectOneSQL string
 }
 
+// ---- 查询条件构建 ----
+
+type WhereBuilder struct {
+	conditions []string
+	args       []any
+	orderBy    string
+	limit      int
+	offset     int
+}
+
+func Where(condition string, args ...any) *WhereBuilder {
+	wb := &WhereBuilder{}
+	return wb.And(condition, args...)
+}
+
+func (wb *WhereBuilder) And(condition string, args ...any) *WhereBuilder {
+	wb.conditions = append(wb.conditions, condition)
+	wb.args = append(wb.args, args...)
+	return wb
+}
+
+func (wb *WhereBuilder) OrderBy(orderBy string) *WhereBuilder {
+	wb.orderBy = orderBy
+	return wb
+}
+
+func (wb *WhereBuilder) Limit(limit int) *WhereBuilder {
+	wb.limit = limit
+	return wb
+}
+
+func (wb *WhereBuilder) Offset(offset int) *WhereBuilder {
+	wb.offset = offset
+	return wb
+}
+
+// reindex 将条件中的 $1, $2... 占位符按照 startIdx 重新编号
+// 这样在 InsertMany 等场景拼 SQL 时不会冲突
+func (wb *WhereBuilder) buildSQL(startIdx int) (string, []any) {
+	if wb == nil || len(wb.conditions) == 0 {
+		return "", nil
+	}
+
+	// 重新编号占位符
+	var reindexed []string
+	argIdx := startIdx
+	for _, cond := range wb.conditions {
+		var newCond strings.Builder
+		i := 0
+		for i < len(cond) {
+			if cond[i] == '$' {
+				// 跳过原始的 $N
+				j := i + 1
+				for j < len(cond) && cond[j] >= '0' && cond[j] <= '9' {
+					j++
+				}
+				newCond.WriteString(fmt.Sprintf("$%d", argIdx))
+				argIdx++
+				i = j
+			} else {
+				newCond.WriteByte(cond[i])
+				i++
+			}
+		}
+		reindexed = append(reindexed, newCond.String())
+	}
+
+	clause := " WHERE " + strings.Join(reindexed, " AND ")
+
+	if wb.orderBy != "" {
+		clause += " ORDER BY " + wb.orderBy
+	}
+	if wb.limit > 0 {
+		clause += fmt.Sprintf(" LIMIT %d", wb.limit)
+	}
+	if wb.offset > 0 {
+		clause += fmt.Sprintf(" OFFSET %d", wb.offset)
+	}
+
+	return clause, wb.args
+}
+
+// ---- 分页结果 ----
+
+type Page[T DBEntity] struct {
+	Total int64 `json:"total"`
+	Items []*T  `json:"items"`
+}
+
+// ---- 缓存相关 ----
+
 var (
 	tableStore  = syncx.NewResourceManager[any]()
 	timeType    = reflect.TypeOf(time.Time{})
 	valuerType  = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
 	scannerType = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
-	// rawBytesType 已移除：sql.RawBytes 是 []byte（Kind=Slice），不会进 Struct 分支
 )
 
 func GetTable[T DBEntity]() *Table[T] {
@@ -64,7 +154,6 @@ func GetTable[T DBEntity]() *Table[T] {
 		panic("T must be a struct")
 	}
 
-	// 修复 #13：用完整包路径作为缓存 key，防止跨包同名 struct 冲突
 	cacheKey := tType.PkgPath() + "." + tType.Name()
 
 	tableObj, err := tableStore.GetResource(cacheKey, func() (any, error) {
@@ -121,7 +210,6 @@ func GetTable[T DBEntity]() *Table[T] {
 			placeholders = append(placeholders, fmt.Sprintf("$%d", len(columns)))
 		}
 
-		// 修复 #6：只保留一个检查
 		if pkField == nil {
 			return nil, fmt.Errorf("table %s must have an id field", tType.Name())
 		}
@@ -152,12 +240,8 @@ func GetTable[T DBEntity]() *Table[T] {
 	return tableObj.(*Table[T])
 }
 
-func (t *Table[T]) InsertOne(ctx context.Context, entity *T) error {
-	pool, err := PoolManager.Get(ctx)
-	if err != nil {
-		return err
-	}
-
+// 将对象提取为insert的参数
+func (t *Table[T]) extractInsertArgs(ctx context.Context, entity *T) ([]any, error) {
 	val := reflect.ValueOf(entity).Elem()
 	args := make([]any, 0, len(t.insertFields))
 
@@ -166,48 +250,39 @@ func (t *Table[T]) InsertOne(ctx context.Context, entity *T) error {
 		value, err := getValue(fieldValue)
 		if err != nil {
 			slog.ErrorContext(ctx, "get value error", "field", field.Name, "err", err)
-			return err
+			return nil, err
 		}
 		args = append(args, value)
 	}
-
-	row := pool.QueryRow(ctx, t.insertOneSQL, args...)
-	var returnedID int64
-	if err := row.Scan(&returnedID); err != nil {
-		slog.ErrorContext(ctx, "InsertOne error", "err", err)
-		return err
-	}
-
-	val.Field(t.pkField.Index).SetInt(returnedID)
-	return nil
+	return args, nil
 }
 
-func (t *Table[T]) FindByID(ctx context.Context, id int64) (res *T, err error) {
-	pool, err := PoolManager.Get(ctx)
-	if err != nil {
-		return nil, err
+// ---- 构建 scan 目标和后处理 ----
+
+type scanContext struct {
+	scanArgs    []any
+	jsonBuffers [][]byte
+	ptrSlots    []ptrScanSlot
+}
+
+func (t *Table[T]) prepareScan(val reflect.Value) *scanContext {
+	sc := &scanContext{
+		scanArgs:    make([]any, len(t.fields)),
+		jsonBuffers: make([][]byte, len(t.fields)),
+		ptrSlots:    make([]ptrScanSlot, 0, len(t.fields)),
 	}
-
-	row := pool.QueryRow(ctx, t.selectOneSQL, id)
-
-	var entity T
-	val := reflect.ValueOf(&entity).Elem()
-
-	scanArgs := make([]any, len(t.fields))
-	jsonBuffers := make([][]byte, len(t.fields))
-	ptrSlots := make([]ptrScanSlot, 0, len(t.fields))
 
 	for i, field := range t.fields {
 		fieldVal := val.Field(field.Index)
 
 		switch field.ScanKind {
 		case scanJSON:
-			scanArgs[i] = &jsonBuffers[i]
+			sc.scanArgs[i] = &sc.jsonBuffers[i]
 
 		case scanPtrString:
 			var ns sql.NullString
-			scanArgs[i] = &ns
-			ptrSlots = append(ptrSlots, ptrScanSlot{
+			sc.scanArgs[i] = &ns
+			sc.ptrSlots = append(sc.ptrSlots, ptrScanSlot{
 				fieldIndex: field.Index,
 				kind:       scanPtrString,
 				elemType:   field.ElemType,
@@ -216,8 +291,8 @@ func (t *Table[T]) FindByID(ctx context.Context, id int64) (res *T, err error) {
 
 		case scanPtrBool:
 			var nb sql.NullBool
-			scanArgs[i] = &nb
-			ptrSlots = append(ptrSlots, ptrScanSlot{
+			sc.scanArgs[i] = &nb
+			sc.ptrSlots = append(sc.ptrSlots, ptrScanSlot{
 				fieldIndex: field.Index,
 				kind:       scanPtrBool,
 				elemType:   field.ElemType,
@@ -226,8 +301,8 @@ func (t *Table[T]) FindByID(ctx context.Context, id int64) (res *T, err error) {
 
 		case scanPtrInt:
 			var ni sql.NullInt64
-			scanArgs[i] = &ni
-			ptrSlots = append(ptrSlots, ptrScanSlot{
+			sc.scanArgs[i] = &ni
+			sc.ptrSlots = append(sc.ptrSlots, ptrScanSlot{
 				fieldIndex: field.Index,
 				kind:       scanPtrInt,
 				elemType:   field.ElemType,
@@ -236,8 +311,8 @@ func (t *Table[T]) FindByID(ctx context.Context, id int64) (res *T, err error) {
 
 		case scanPtrUint:
 			var ni sql.NullInt64
-			scanArgs[i] = &ni
-			ptrSlots = append(ptrSlots, ptrScanSlot{
+			sc.scanArgs[i] = &ni
+			sc.ptrSlots = append(sc.ptrSlots, ptrScanSlot{
 				fieldIndex: field.Index,
 				kind:       scanPtrUint,
 				elemType:   field.ElemType,
@@ -246,8 +321,8 @@ func (t *Table[T]) FindByID(ctx context.Context, id int64) (res *T, err error) {
 
 		case scanPtrFloat:
 			var nf sql.NullFloat64
-			scanArgs[i] = &nf
-			ptrSlots = append(ptrSlots, ptrScanSlot{
+			sc.scanArgs[i] = &nf
+			sc.ptrSlots = append(sc.ptrSlots, ptrScanSlot{
 				fieldIndex: field.Index,
 				kind:       scanPtrFloat,
 				elemType:   field.ElemType,
@@ -255,22 +330,24 @@ func (t *Table[T]) FindByID(ctx context.Context, id int64) (res *T, err error) {
 			})
 
 		default:
-			scanArgs[i] = fieldVal.Addr().Interface()
+			sc.scanArgs[i] = fieldVal.Addr().Interface()
 		}
 	}
 
-	if err = row.Scan(scanArgs...); err != nil {
-		slog.ErrorContext(ctx, "FindByID error", "err", err)
-		return nil, err
-	}
+	return sc
+}
 
-	for _, slot := range ptrSlots {
+// 后置处理扫描赋值（JSON类 和 自定义逻辑类）
+func (t *Table[T]) finalizeScan(val reflect.Value, sc *scanContext) error {
+	// 处理指针类型
+	for _, slot := range sc.ptrSlots {
 		if err := slot.apply(val); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	for i, buf := range jsonBuffers {
+	// 处理 JSON 类型
+	for i, buf := range sc.jsonBuffers {
 		if len(buf) == 0 {
 			continue
 		}
@@ -286,12 +363,270 @@ func (t *Table[T]) FindByID(ctx context.Context, id int64) (res *T, err error) {
 		}
 
 		if err := json.Unmarshal(buf, fieldVal.Addr().Interface()); err != nil {
-			return nil, fmt.Errorf("unmarshal json field %s failed: %w", field.Name, err)
+			return fmt.Errorf("unmarshal json field %s failed: %w", field.Name, err)
 		}
+	}
+
+	return nil
+}
+
+// ---- 列名拼接（复用） ----
+
+func (t *Table[T]) allColumnSQL() string {
+	cols := make([]string, len(t.fields))
+	for i, f := range t.fields {
+		cols[i] = f.DBName
+	}
+	return strings.Join(cols, ", ")
+}
+
+func (t *Table[T]) insertColumnSQL() string {
+	cols := make([]string, len(t.insertFields))
+	for i, f := range t.insertFields {
+		cols[i] = f.DBName
+	}
+	return strings.Join(cols, ", ")
+}
+
+// ---- InsertOne ----
+
+func (t *Table[T]) InsertOne(ctx context.Context, entity *T) error {
+	pool, err := PoolManager.Get(ctx)
+	if err != nil {
+		return err
+	}
+
+	args, err := t.extractInsertArgs(ctx, entity)
+	if err != nil {
+		return err
+	}
+
+	row := pool.QueryRow(ctx, t.insertOneSQL, args...)
+	var returnedID int64
+	if err := row.Scan(&returnedID); err != nil {
+		slog.ErrorContext(ctx, "InsertOne error", "err", err)
+		return err
+	}
+
+	reflect.ValueOf(entity).Elem().Field(t.pkField.Index).SetInt(returnedID)
+	return nil
+}
+
+// ---- InsertMany ----
+
+func (t *Table[T]) InsertMany(ctx context.Context, entities []*T) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	pool, err := PoolManager.Get(ctx)
+	if err != nil {
+		return err
+	}
+
+	colCount := len(t.insertFields)
+	allArgs := make([]any, 0, colCount*len(entities))
+	valueGroups := make([]string, 0, len(entities))
+
+	for rowIdx, entity := range entities {
+		args, err := t.extractInsertArgs(ctx, entity)
+		if err != nil {
+			return err
+		}
+		allArgs = append(allArgs, args...)
+
+		// 构建 ($1, $2, $3), ($4, $5, $6), ...
+		placeholders := make([]string, colCount)
+		base := rowIdx * colCount
+		for j := 0; j < colCount; j++ {
+			placeholders[j] = fmt.Sprintf("$%d", base+j+1)
+		}
+		valueGroups = append(valueGroups, "("+strings.Join(placeholders, ", ")+")")
+	}
+
+	query := fmt.Sprintf(
+		"INSERT INTO %s (%s) VALUES %s RETURNING id",
+		t.name,
+		t.insertColumnSQL(),
+		strings.Join(valueGroups, ", "),
+	)
+
+	rows, err := pool.Query(ctx, query, allArgs...)
+	if err != nil {
+		slog.ErrorContext(ctx, "InsertMany error", "err", err)
+		return err
+	}
+	defer rows.Close()
+
+	i := 0
+	for rows.Next() {
+		var returnedID int64
+		if err := rows.Scan(&returnedID); err != nil {
+			slog.ErrorContext(ctx, "InsertMany scan error", "err", err)
+			return err
+		}
+		reflect.ValueOf(entities[i]).Elem().Field(t.pkField.Index).SetInt(returnedID)
+		i++
+	}
+
+	return rows.Err()
+}
+
+// ---- FindByID ----
+
+func (t *Table[T]) FindByID(ctx context.Context, id int64) (*T, error) {
+	pool, err := PoolManager.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	row := pool.QueryRow(ctx, t.selectOneSQL, id)
+
+	var entity T
+	val := reflect.ValueOf(&entity).Elem()
+	sc := t.prepareScan(val)
+
+	if err = row.Scan(sc.scanArgs...); err != nil {
+		slog.ErrorContext(ctx, "FindByID error", "err", err)
+		return nil, err
+	}
+
+	if err = t.finalizeScan(val, sc); err != nil {
+		return nil, err
 	}
 
 	return &entity, nil
 }
+
+// ---- Find ----
+
+func (t *Table[T]) Find(ctx context.Context, wb *WhereBuilder) ([]*T, error) {
+	pool, err := PoolManager.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s", t.allColumnSQL(), t.name)
+
+	whereClause, whereArgs := wb.buildSQL(1)
+	query += whereClause
+
+	rows, err := pool.Query(ctx, query, whereArgs...)
+	if err != nil {
+		slog.ErrorContext(ctx, "Find error", "err", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	return t.scanRows(rows)
+}
+
+// ---- FindPage ----
+
+func (t *Table[T]) FindPage(ctx context.Context, wb *WhereBuilder, page, pageSize int) (*Page[T], error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	pool, err := PoolManager.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 1. COUNT 查询
+	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM %s", t.name)
+	whereClause, whereArgs := wb.buildSQL(1)
+	countSQL += whereClause
+
+	var total int64
+	if err := pool.QueryRow(ctx, countSQL, whereArgs...).Scan(&total); err != nil {
+		slog.ErrorContext(ctx, "FindPage count error", "err", err)
+		return nil, err
+	}
+
+	result := &Page[T]{Total: total}
+
+	if total == 0 {
+		result.Items = []*T{}
+		return result, nil
+	}
+
+	// 2. 数据查询：在 WHERE 子句基础上追加分页
+	// 先用不带 LIMIT/OFFSET 的 whereBuilder 构建条件
+	dataSQL := fmt.Sprintf("SELECT %s FROM %s", t.allColumnSQL(), t.name)
+
+	// 复制 wb 并追加排序+分页
+	dataWb := &WhereBuilder{
+		conditions: wb.conditions,
+		args:       wb.args,
+		orderBy:    wb.orderBy,
+		limit:      pageSize,
+		offset:     (page - 1) * pageSize,
+	}
+
+	// 如果没有指定排序，默认按 id 排序保证分页稳定
+	if dataWb.orderBy == "" {
+		dataWb.orderBy = "id ASC"
+	}
+
+	dataClause, dataArgs := dataWb.buildSQL(1)
+	dataSQL += dataClause
+
+	rows, err := pool.Query(ctx, dataSQL, dataArgs...)
+	if err != nil {
+		slog.ErrorContext(ctx, "FindPage query error", "err", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	items, err := t.scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	result.Items = items
+	return result, nil
+}
+
+// ---- 多行扫描（复用逻辑） ----
+
+// Rows 接口兼容 pgx 和 database/sql
+type Rows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+}
+
+func (t *Table[T]) scanRows(rows Rows) ([]*T, error) {
+	var results []*T
+
+	for rows.Next() {
+		var entity T
+		val := reflect.ValueOf(&entity).Elem()
+		sc := t.prepareScan(val)
+
+		if err := rows.Scan(sc.scanArgs...); err != nil {
+			return nil, fmt.Errorf("scanRows scan error: %w", err)
+		}
+
+		if err := t.finalizeScan(val, sc); err != nil {
+			return nil, err
+		}
+
+		results = append(results, &entity)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("scanRows iteration error: %w", err)
+	}
+
+	return results, nil
+}
+
+// ---- ptrScanSlot ----
 
 type ptrScanSlot struct {
 	fieldIndex int
@@ -361,17 +696,17 @@ func (s ptrScanSlot) apply(val reflect.Value) error {
 	return nil
 }
 
+// ---- classify / getValue ----
+
 func classifyScanKind(fieldType reflect.Type) (fieldScanKind, reflect.Type) {
-	// *T
+	// 指针类型
 	if fieldType.Kind() == reflect.Ptr {
 		elem := fieldType.Elem()
-
-		// *struct
 		if elem.Kind() == reflect.Struct {
-			if elem == timeType {
+			if elem == timeType { // 时间类型
 				return scanDirect, nil
 			}
-			// 修复 #7：先查 *T（指针接收者），再查 T（值接收者）
+			// 先查 *T（指针接收者），再查 T（值接收者）
 			if fieldType.Implements(scannerType) || fieldType.Implements(valuerType) {
 				return scanDirect, nil
 			}
@@ -419,7 +754,7 @@ func classifyScanKind(fieldType reflect.Type) (fieldScanKind, reflect.Type) {
 		return scanJSON, nil
 	}
 
-	// 修复 #8：Slice / Map → JSON（[]byte 除外）
+	// Slice / Map → JSON（[]byte 除外）
 	if fieldType.Kind() == reflect.Slice {
 		if fieldType == reflect.TypeOf([]byte(nil)) {
 			return scanDirect, nil
@@ -440,14 +775,13 @@ func getValue(fieldValue reflect.Value) (any, error) {
 		if fieldValue.IsNil() {
 			return nil, nil
 		}
-		// 修复 #4：指针接收者的 Valuer 在解引用前捕获
 		if fieldValue.Type().Implements(valuerType) {
-			return fieldValue.Interface().(driver.Valuer).Value() // 修复：不要多加 nil
+			return fieldValue.Interface().(driver.Valuer).Value()
 		}
 		fieldValue = fieldValue.Elem()
 	}
 
-	// 修复：非指针字段，检查指针接收者的 Valuer（如 func (s *MyType) Value()）
+	// 非指针字段，检查指针接收者的 Valuer（如 func (s *MyType) Value()）
 	if fieldValue.CanAddr() {
 		if valuer, ok := fieldValue.Addr().Interface().(driver.Valuer); ok {
 			return valuer.Value()
@@ -477,7 +811,7 @@ func getValue(fieldValue reflect.Value) (any, error) {
 		return jsonData, nil
 	}
 
-	// 修复 #8：slice / map → JSON
+	// slice / map → JSON
 	if fieldValue.Kind() == reflect.Slice || fieldValue.Kind() == reflect.Map {
 		if fieldValue.IsNil() {
 			return nil, nil
