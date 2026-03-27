@@ -15,16 +15,18 @@ var env = flag.String("env", "", "env")
 const defaultConfigFile = "config.yml"
 const configFileTemplate = "config-%s.yml"
 
-func Init(conf any, workDir string) {
+func Init(conf []any) {
 	flag.Parse()
 
 	var err error
-	if workDir == "" {
-		workDir, err = os.Getwd()
-		if err != nil {
-			os.Exit(1)
-		}
+	workDir, err := os.Getwd()
+	if err != nil {
+		os.Exit(1)
 	}
+
+	InitByDir(conf, workDir)
+}
+func InitByDir(conf []any, workDir string) {
 	// 尝试全局配置文件
 	var configFile = defaultConfigFile
 	if *env != "" {
@@ -32,26 +34,28 @@ func Init(conf any, workDir string) {
 	}
 
 	globConfigFile := filepath.Dir(workDir) + "/" + configFile
-	file, err := os.Open(globConfigFile)
+	data, err := os.ReadFile(globConfigFile)
 	if err != nil {
 		panic(err)
 	}
-	defer file.Close()
-	err = yaml.NewDecoder(file).Decode(conf)
-	if err != nil {
-		panic(err)
+	for _, item := range conf {
+		err = yaml.Unmarshal(data, item)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	// 尝试项目配置文件
 	appConfigFile := workDir + "/" + configFile
-	file, err = os.Open(appConfigFile)
+	data, err = os.ReadFile(appConfigFile)
 	if err != nil {
 		panic(err)
 	}
-	defer file.Close()
-	err = yaml.NewDecoder(file).Decode(conf)
-	if err != nil {
-		panic(err)
+	for _, item := range conf {
+		err = yaml.Unmarshal(data, item)
+		if err != nil {
+			panic(err)
+		}
 	}
 	//slog.Info("Config loaded", "conf", conf)
 	slog.Info("Config loaded", "appConfigFile", appConfigFile, "globConfigFile", globConfigFile)

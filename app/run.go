@@ -2,6 +2,7 @@ package app
 
 import (
 	"os"
+	"reflect"
 	"sync"
 
 	"github.com/Gong-Yang/g-micor/config"
@@ -15,12 +16,13 @@ import (
 type Module interface {
 	Init(s grpc.ServiceRegistrar) string
 	Router(router gin.IRouter)
+	Config() any
 }
 
 func Run(modules ...Module) {
 	var wg = &sync.WaitGroup{}
 	// 初始化配置
-	InitConf()
+	InitConf(modules)
 	var Hostname, _ = os.Hostname()
 	Hostname = Conf.App.Name + ":" + Hostname
 	// 初始化日志
@@ -40,23 +42,20 @@ func Run(modules ...Module) {
 	wg.Wait()
 }
 
-func InitConf() {
+func InitConf(modules []Module) {
 	Conf = &Config{}
-	config.Init(Conf, "")
-}
-
-func TestInit(workDir string) {
-	// 初始化配置
-	Conf = &Config{}
-	config.Init(Conf, workDir)
-	var Hostname, _ = os.Hostname()
-	Hostname = Conf.App.Name + ":" + Hostname
-	// 初始化mongo
-	err := mongox.InitDB(Conf.Mongo.Uri, Conf.Mongo.Database)
-	if err != nil {
-		panic(err)
+	var conf = make([]any, 0, len(modules)+1)
+	conf = append(conf, Conf)
+	for _, module := range modules {
+		configItem := module.Config()
+		if configItem == nil {
+			continue
+		}
+		rv := reflect.ValueOf(configItem)
+		if rv.Kind() != reflect.Ptr || rv.IsNil() {
+			panic("config item must be a pointer")
+		}
+		conf = append(conf, configItem)
 	}
-	// 初始化Redis
-	redisConf := Conf.Redis
-	redisx.Init(Hostname, &redis.Options{Addr: redisConf.Addr, Password: redisConf.Password, DB: redisConf.Db})
+	config.Init(conf)
 }
