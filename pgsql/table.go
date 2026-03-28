@@ -771,3 +771,91 @@ func getValue(fieldValue reflect.Value) (any, error) {
 
 	return fieldValue.Interface(), nil
 }
+
+// ---- UpdateByID ----
+
+func (t *Table[T]) UpdateByID(ctx context.Context, entity *T) error {
+	pool, err := PoolManager.Get(ctx)
+	if err != nil {
+		return err
+	}
+
+	val := reflect.ValueOf(entity).Elem()
+	id := val.Field(t.pkField.Index).Int()
+	if id == 0 {
+		return fmt.Errorf("UpdateByID: entity id must not be zero")
+	}
+
+	// 构建 SET 子句（排除 id）
+	setClauses := make([]string, len(t.insertFields))
+	args := make([]any, 0, len(t.insertFields)+1)
+
+	for i, field := range t.insertFields {
+		setClauses[i] = fmt.Sprintf("%s = $%d", field.DBName, i+1)
+		fieldValue := val.Field(field.Index)
+		value, err := getValue(fieldValue)
+		if err != nil {
+			slog.ErrorContext(ctx, "UpdateByID get value error", "field", field.Name, "err", err)
+			return err
+		}
+		args = append(args, value)
+	}
+
+	// id 作为最后一个参数
+	args = append(args, id)
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s WHERE id = $%d",
+		t.name,
+		strings.Join(setClauses, ", "),
+		len(t.insertFields)+1,
+	)
+
+	cmdTag, err := pool.Exec(ctx, query, args...)
+	if err != nil {
+		slog.ErrorContext(ctx, "UpdateByID error", "err", err)
+		return err
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return fmt.Errorf("UpdateByID: no rows affected, id=%d", id)
+	}
+
+	return nil
+}
+
+// ---- Update ----
+
+func (t *Table[T]) Update(ctx context.Context, ub *UpdateBuilder, wb *WhereBuilder) (int64, error) {
+	if ub == nil || len(ub.sets) == 0 {
+		return 0, fmt.Errorf("Update: nothing to set")
+	}
+	if wb == nil || len(wb.conditions) == 0 {
+		return 0, fmt.Errorf("Update: where condition is required to prevent full table update")
+	}
+
+	pool, err := PoolManager.Get(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	// SET 子句从 $1 开始
+	setClause, setArgs, nextIdx := ub.buildSQL(1)
+
+	// WHERE 子句紧接着 SET 的编号
+	whereClause, whereArgs := wb.buildSQL(nextIdx)
+
+	query := fmt.Sprintf("UPDATE %s %s%s", t.name, setClause, whereClause)
+
+	// 合并参数
+	allArgs := make([]any, 0, len(setArgs)+len(whereArgs))
+	allArgs = append(allArgs, setArgs...)
+	allArgs = append(allArgs, whereArgs...)
+
+	cmdTag, err := pool.Exec(ctx, query, allArgs...)
+	if err != nil {
+		slog.ErrorContext(ctx, "Update error", "err", err)
+		return 0, err
+	}
+
+	return cmdTag.RowsAffected(), nil
+}
