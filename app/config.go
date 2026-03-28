@@ -5,6 +5,7 @@ var Conf *Config
 type Config struct {
 	App     AppConfig
 	Mongo   MongoConfig
+	PGSQL   PGSQLConfig
 	Redis   RedisConfig
 	Observe OpenObserveConfig
 }
@@ -24,6 +25,9 @@ type RedisConfig struct {
 	Db       int
 }
 
+type PGSQLConfig struct {
+	Uri string
+}
 type MongoConfig struct {
 	Uri      string
 	Database string
