@@ -20,6 +20,10 @@ func Where(condition string, args ...any) *WhereBuilder {
 	return wb.And(condition, args...)
 }
 
+func OrderBy(condition string) *WhereBuilder {
+	wb := &WhereBuilder{}
+	return wb.OrderBy(condition)
+}
 func (wb *WhereBuilder) And(condition string, args ...any) *WhereBuilder {
 	wb.conditions = append(wb.conditions, condition)
 	wb.args = append(wb.args, args...)
@@ -44,7 +48,7 @@ func (wb *WhereBuilder) Offset(offset int) *WhereBuilder {
 // reindex 将条件中的 $1, $2... 占位符按照 startIdx 重新编号
 // 这样在 InsertMany 等场景拼 SQL 时不会冲突
 func (wb *WhereBuilder) buildSQL(startIdx int) (string, []any) {
-	if wb == nil || len(wb.conditions) == 0 {
+	if wb == nil || (len(wb.conditions) == 0 && wb.orderBy == "" && wb.limit == 0) {
 		return "", nil
 	}
 
@@ -72,7 +76,10 @@ func (wb *WhereBuilder) buildSQL(startIdx int) (string, []any) {
 		reindexed = append(reindexed, newCond.String())
 	}
 
-	clause := " WHERE " + strings.Join(reindexed, " AND ")
+	clause := ""
+	if len(reindexed) > 0 {
+		clause = " WHERE " + strings.Join(reindexed, " AND ")
+	}
 
 	if wb.orderBy != "" {
 		clause += " ORDER BY " + wb.orderBy

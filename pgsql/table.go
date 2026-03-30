@@ -473,6 +473,27 @@ func (t *Table[T]) Find(ctx context.Context, wb *WhereBuilder) ([]*T, error) {
 
 	return t.scanRows(rows)
 }
+func (t *Table[T]) Count(ctx context.Context, wb *WhereBuilder) (int64, error) {
+	pool, err := PoolManager.Get(ctx)
+	if err != nil {
+		return 0, err
+	}
+	newWb := &WhereBuilder{
+		conditions: wb.conditions,
+		args:       wb.args,
+	}
+	// 1. COUNT 查询
+	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM %s", t.name)
+	whereClause, whereArgs := newWb.buildSQL(1)
+	countSQL += whereClause
+
+	var total int64
+	if err := pool.QueryRow(ctx, countSQL, whereArgs...).Scan(&total); err != nil {
+		slog.ErrorContext(ctx, "FindPage count error", "err", err)
+		return 0, err
+	}
+	return total, nil
+}
 
 // ---- FindPage ----
 
@@ -490,19 +511,15 @@ func (t *Table[T]) FindPage(ctx context.Context, wb *WhereBuilder, page, pageSiz
 	}
 
 	// 1. COUNT 查询
-	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM %s", t.name)
-	whereClause, whereArgs := wb.buildSQL(1)
-	countSQL += whereClause
-
-	var total int64
-	if err := pool.QueryRow(ctx, countSQL, whereArgs...).Scan(&total); err != nil {
+	count, err := t.Count(ctx, wb)
+	if err != nil {
 		slog.ErrorContext(ctx, "FindPage count error", "err", err)
 		return nil, err
 	}
 
-	result := &Page[T]{Total: total}
+	result := &Page[T]{Total: count}
 
-	if total == 0 {
+	if count == 0 {
 		result.Items = []*T{}
 		return result, nil
 	}
