@@ -7,6 +7,7 @@ import (
 
 	"github.com/Gong-Yang/g-micor/config"
 	"github.com/Gong-Yang/g-micor/mongox"
+	"github.com/Gong-Yang/g-micor/pgsql"
 	"github.com/Gong-Yang/g-micor/redisx"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -28,9 +29,17 @@ func Run(modules ...Module) {
 	// 初始化日志
 	initLog()
 	// 初始化mongo
-	err := mongox.InitDB(Conf.Mongo.Uri, Conf.Mongo.Database)
-	if err != nil {
-		panic(err)
+	if Conf.Mongo.Uri != "" {
+		err := mongox.InitDB(Conf.Mongo.Uri, Conf.Mongo.Database)
+		if err != nil {
+			panic(err)
+		}
+	}
+	if Conf.PGSQL.Uri != "" {
+		err := pgsql.Init(Conf.PGSQL.Uri)
+		if err != nil {
+			panic(err)
+		}
 	}
 	// 初始化Redis
 	redisConf := Conf.Redis

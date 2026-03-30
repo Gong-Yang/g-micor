@@ -15,7 +15,6 @@ import (
 )
 
 type DBEntity interface {
-	TableName() string
 }
 
 type fieldScanKind uint8
@@ -66,14 +65,14 @@ var (
 	scannerType = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 )
 
-func GetTable[T DBEntity]() *Table[T] {
+func GetTable[T DBEntity](tableName string) *Table[T] {
 	var t T
 	tType := reflect.TypeOf(t)
 	if tType == nil || tType.Kind() != reflect.Struct {
 		panic("T must be a struct")
 	}
 
-	cacheKey := tType.PkgPath() + "." + tType.Name()
+	cacheKey := tType.PkgPath() + "." + tType.Name() + tableName
 
 	tableObj, err := tableStore.GetResource(cacheKey, func() (any, error) {
 		var (
@@ -133,7 +132,6 @@ func GetTable[T DBEntity]() *Table[T] {
 			return nil, fmt.Errorf("table %s must have an id field", tType.Name())
 		}
 
-		tableName := t.TableName()
 		return &Table[T]{
 			name:         tableName,
 			fields:       fields,
@@ -423,6 +421,33 @@ func (t *Table[T]) FindByID(ctx context.Context, id int64) (*T, error) {
 		return nil, err
 	}
 
+	return &entity, nil
+}
+
+// ---- Find ----
+
+func (t *Table[T]) FindOne(ctx context.Context, wb *WhereBuilder) (*T, error) {
+	pool, err := PoolManager.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s", t.allColumnSQL(), t.name)
+
+	whereClause, whereArgs := wb.buildSQL(1)
+	query = query + whereClause + " LIMIT 1"
+
+	row := pool.QueryRow(ctx, query, whereArgs...)
+	var entity T
+	val := reflect.ValueOf(&entity).Elem()
+	sc := t.prepareScan(val)
+	if err = row.Scan(sc.scanArgs...); err != nil {
+		slog.InfoContext(ctx, "FindOne error", "err", err)
+		return nil, err
+	}
+	if err = t.finalizeScan(val, sc); err != nil {
+		return nil, err
+	}
 	return &entity, nil
 }
 

@@ -73,7 +73,9 @@ func wrapError(c *gin.Context, a any, isPanic bool) {
 				"err", a,
 				"stack", stackTrace,
 				"path", c.Request.URL.Path)
-			c.AbortWithStatus(http.StatusInternalServerError)
+			appErr = errorx.ErrorCode{Code: errorx.RespErr, Msg: "请联系管理员"}
+			c.AbortWithStatusJSON(http.StatusInternalServerError, appErr)
+			//c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		} else {
 			slog.WarnContext(ctx, "sysError",

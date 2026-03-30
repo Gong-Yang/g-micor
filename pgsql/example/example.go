@@ -10,7 +10,7 @@ import (
 	"github.com/Gong-Yang/g-micor/util/random"
 )
 
-var UserStore = pgsql.GetTable[User]()
+var UserStore = pgsql.GetTable[User]("users")
 
 func main() {
 	err := pgsql.Init("postgres://postgres:123456@localhost:5432/postgres")

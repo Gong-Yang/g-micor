@@ -5,7 +5,7 @@ var Conf *Config
 type Config struct {
 	App     AppConfig
 	Mongo   MongoConfig
-	PGSQL   PGSQLConfig
+	PGSQL   PGSQLConfig `yaml:"pgSQL"`
 	Redis   RedisConfig
 	Observe OpenObserveConfig
 }
@@ -32,7 +32,6 @@ type MongoConfig struct {
 	Uri      string
 	Database string
 }
-
 type OpenObserveConfig struct {
 	Endpoint     string
 	Organization string

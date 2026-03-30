@@ -2,6 +2,7 @@ package pgsql
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/Gong-Yang/g-micor/syncx"
@@ -24,6 +25,7 @@ func Init(configconnString string) (err error) {
 	}
 	PoolManager.defaultPool = pool
 	PoolManager.store.Inject("", pool)
+	slog.Info("pgsql init success")
 	return nil
 }
 
