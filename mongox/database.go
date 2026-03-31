@@ -3,6 +3,7 @@ package mongox
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -32,7 +33,7 @@ func InitDB(uri string, dbname string) error {
 		return err
 	}
 
-	fmt.Println("Connected to MongoDB successfully!")
+	slog.Info("Connected to MongoDB successfully!")
 	db = client.Database(dbname)
 
 	return nil

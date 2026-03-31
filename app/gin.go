@@ -16,7 +16,8 @@ func webStart(wg *sync.WaitGroup, service []Module) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		engine := gin.Default()
+		gin.SetMode(gin.ReleaseMode)
+		engine := gin.New()
 		engine.Use(ginx.BasicMiddleware)
 		for _, server := range service {
 			server.Router(engine)
