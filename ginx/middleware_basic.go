@@ -22,6 +22,9 @@ func BasicMiddleware(ctx *gin.Context) {
 	logx.RequestAddAttrs(ctx, ContextTraceID, traceID)
 	// 添加panic恢复处理
 	defer handlePanic(ctx)
+	slog.InfoContext(ctx, "request start",
+		"path", ctx.Request.URL.Path,
+		"method", ctx.Request.Method)
 	// 执行请求处理链
 	ctx.Next()
 	// 请求正常完成，统一包装响应
