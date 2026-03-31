@@ -136,7 +136,7 @@ func (t *Table[T]) FindOne(ctx context.Context, wb *WhereBuilder) (*T, error) {
 	val := reflect.ValueOf(&entity).Elem()
 	sc := t.prepareScan(val)
 	if err = row.Scan(sc.scanArgs...); err != nil {
-		slog.InfoContext(ctx, "FindOne error", "err", err)
+		//slog.InfoContext(ctx, "FindOne error", "err", err)
 		return nil, err
 	}
 	if err = t.finalizeScan(val, sc); err != nil {
