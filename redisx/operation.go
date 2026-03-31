@@ -191,13 +191,13 @@ func GetJSON[T any](ctx context.Context, key string, out T) error {
 func SetPorto(ctx context.Context, key string, value proto.Message, expire time.Duration) error {
 	byteArr, err := proto.Marshal(value)
 	if err != nil {
-		slog.InfoContext(ctx, "TODO")
+		slog.ErrorContext(ctx, "SetProto marshal error", "err", err, "key", key)
 		return err
 	}
 
 	err = Client.Set(ctx, key, byteArr, expire).Err()
 	if err != nil {
-		// TODO
+		slog.ErrorContext(ctx, "SetProto redis set error", "err", err, "key", key)
 		return err
 	}
 	return nil
