@@ -11,56 +11,45 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// SetSimple 存储简单对象（string、int/uint、float、bool）
-func SetSimple[T comparable](ctx context.Context, key string, value T, expire time.Duration) error {
-	var s string
+// convertSimpleValue 将简单类型转换为 string
+func convertSimpleValue[T comparable](value T) (string, error) {
 	switch v := any(value).(type) {
 	case string:
-		s = v
+		return v, nil
 	case int:
-		s = strconv.FormatInt(int64(v), 10)
+		return strconv.FormatInt(int64(v), 10), nil
 	case int8:
-		s = strconv.FormatInt(int64(v), 10)
+		return strconv.FormatInt(int64(v), 10), nil
 	case int16:
-		s = strconv.FormatInt(int64(v), 10)
+		return strconv.FormatInt(int64(v), 10), nil
 	case int32:
-		s = strconv.FormatInt(int64(v), 10)
+		return strconv.FormatInt(int64(v), 10), nil
 	case int64:
-		s = strconv.FormatInt(v, 10)
+		return strconv.FormatInt(v, 10), nil
 	case uint:
-		s = strconv.FormatUint(uint64(v), 10)
+		return strconv.FormatUint(uint64(v), 10), nil
 	case uint8:
-		s = strconv.FormatUint(uint64(v), 10)
+		return strconv.FormatUint(uint64(v), 10), nil
 	case uint16:
-		s = strconv.FormatUint(uint64(v), 10)
+		return strconv.FormatUint(uint64(v), 10), nil
 	case uint32:
-		s = strconv.FormatUint(uint64(v), 10)
+		return strconv.FormatUint(uint64(v), 10), nil
 	case uint64:
-		s = strconv.FormatUint(v, 10)
+		return strconv.FormatUint(v, 10), nil
 	case float32:
-		s = strconv.FormatFloat(float64(v), 'g', -1, 32)
+		return strconv.FormatFloat(float64(v), 'g', -1, 32), nil
 	case float64:
-		s = strconv.FormatFloat(v, 'g', -1, 64)
+		return strconv.FormatFloat(v, 'g', -1, 64), nil
 	case bool:
-		s = strconv.FormatBool(v)
+		return strconv.FormatBool(v), nil
 	default:
-		slog.InfoContext(ctx, "SetSimple unsupported type")
-		return errors.New("SetSimple unsupported type")
+		return "", errors.New("unsupported simple type")
 	}
-	if err := Client.Set(ctx, key, s, expire).Err(); err != nil {
-		slog.InfoContext(ctx, "SetSimple redis set error", "err", err)
-		return err
-	}
-	return nil
 }
 
-// GetSimple 获取简单对象（string、int/uint、float、bool）
-func GetSimple[T comparable](ctx context.Context, key string) (T, error) {
+// parseSimpleValue 将 string 转换为目标简单类型
+func parseSimpleValue[T comparable](s string) (T, error) {
 	var result T
-	s, err := Client.Get(ctx, key).Result()
-	if err != nil {
-		return result, err
-	}
 	switch any(result).(type) {
 	case string:
 		return any(s).(T), nil
@@ -160,6 +149,30 @@ func GetSimple[T comparable](ctx context.Context, key string) (T, error) {
 	}
 }
 
+// SetSimple 存储简单对象（string、int/uint、float、bool）
+func SetSimple[T comparable](ctx context.Context, key string, value T, expire time.Duration) error {
+	s, err := convertSimpleValue(value)
+	if err != nil {
+		slog.InfoContext(ctx, "SetSimple unsupported type", "err", err)
+		return err
+	}
+	if err := Client.Set(ctx, key, s, expire).Err(); err != nil {
+		slog.InfoContext(ctx, "SetSimple redis set error", "err", err)
+		return err
+	}
+	return nil
+}
+
+// GetSimple 获取简单对象（string、int/uint、float、bool）
+func GetSimple[T comparable](ctx context.Context, key string) (T, error) {
+	s, err := Client.Get(ctx, key).Result()
+	if err != nil {
+		var res T
+		return res, err
+	}
+	return parseSimpleValue[T](s)
+}
+
 // SetJSON 将任意对象序列化为 JSON 并存入 Redis
 func SetJSON(ctx context.Context, key string, value any, expire time.Duration) error {
 	data, err := json.Marshal(value)
@@ -213,4 +226,63 @@ func GetProto[T proto.Message](ctx context.Context, key string, out T) error {
 		return err
 	}
 	return nil
+}
+
+// SetNXSimple 存储简单对象（string、int/uint、float、bool），仅当 key 不存在时
+func SetNXSimple[T comparable](ctx context.Context, key string, value T, expire time.Duration) (bool, error) {
+	s, err := convertSimpleValue(value)
+	if err != nil {
+		slog.InfoContext(ctx, "SetNXSimple unsupported type", "err", err)
+		return false, err
+	}
+	result, err := Client.SetNX(ctx, key, s, expire).Result()
+	if err != nil {
+		slog.InfoContext(ctx, "SetNXSimple redis set error", "err", err)
+		return false, err
+	}
+	return result, nil
+}
+
+// SetNXJSON 将任意对象序列化为 JSON 并存入 Redis，仅当 key 不存在时
+func SetNXJSON(ctx context.Context, key string, value any, expire time.Duration) (bool, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		slog.InfoContext(ctx, "SetNXJSON marshal error", "err", err)
+		return false, err
+	}
+	result, err := Client.SetNX(ctx, key, data, expire).Result()
+	if err != nil {
+		slog.InfoContext(ctx, "SetNXJSON redis set error", "err", err)
+		return false, err
+	}
+	return result, nil
+}
+
+// SetNXProto 将 proto.Message 对象序列化为字节数组并保存到 Redis，仅当 key 不存在时
+func SetNXProto(ctx context.Context, key string, value proto.Message, expire time.Duration) (bool, error) {
+	byteArr, err := proto.Marshal(value)
+	if err != nil {
+		slog.ErrorContext(ctx, "SetNXProto marshal error", "err", err, "key", key)
+		return false, err
+	}
+
+	result, err := Client.SetNX(ctx, key, byteArr, expire).Result()
+	if err != nil {
+		slog.ErrorContext(ctx, "SetNXProto redis set error", "err", err, "key", key)
+		return false, err
+	}
+	return result, nil
+}
+
+// Delete 删除一个或多个 key，返回删除的数量
+func Delete(ctx context.Context, keys ...string) (int64, error) {
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	count, err := Client.Del(ctx, keys...).Result()
+	if err != nil {
+		slog.InfoContext(ctx, "Delete redis del error", "err", err, "keys", keys)
+		return 0, err
+	}
+	return count, nil
 }
