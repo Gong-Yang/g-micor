@@ -8,6 +8,17 @@ import (
 	"strings"
 )
 
+// ID 提前生成ID
+func (t *Table[T]) ID(ctx context.Context) (id int64, err error) {
+	pool, err := PoolManager.Get(ctx)
+	if err != nil {
+		return
+	}
+	nextval := fmt.Sprintf("SELECT nextval(pg_get_serial_sequence('%s', 'id'))", t.name)
+	err = pool.QueryRow(ctx, nextval).Scan(&id)
+	return
+}
+
 // ---- InsertOne ----
 
 func (t *Table[T]) InsertOne(ctx context.Context, entity *T) error {
@@ -30,17 +41,6 @@ func (t *Table[T]) InsertOne(ctx context.Context, entity *T) error {
 
 	reflect.ValueOf(entity).Elem().Field(t.pkField.Index).SetInt(returnedID)
 	return nil
-}
-
-// ID 提前生成ID
-func (t *Table[T]) ID(ctx context.Context) (id int64, err error) {
-	pool, err := PoolManager.Get(ctx)
-	if err != nil {
-		return
-	}
-	nextval := fmt.Sprintf("SELECT nextval(pg_get_serial_sequence('%s', 'id'))", t.name)
-	err = pool.QueryRow(ctx, nextval).Scan(&id)
-	return
 }
 
 // ---- InsertMany ----
