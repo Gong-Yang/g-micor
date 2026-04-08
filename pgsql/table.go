@@ -44,8 +44,7 @@ type Table[T DBEntity] struct {
 	name         string
 	pkField      *fieldMeta
 	fields       []*fieldMeta
-	insertFields []*fieldMeta
-	insertOneSQL string
+	insertFields []*fieldMeta // 不含 id
 	selectOneSQL string
 }
 
@@ -137,12 +136,6 @@ func GetTable[T DBEntity](tableName string) *Table[T] {
 			fields:       fields,
 			insertFields: insertFields,
 			pkField:      pkField,
-			insertOneSQL: fmt.Sprintf(
-				"INSERT INTO %s (%s) VALUES (%s) RETURNING id",
-				tableName,
-				strings.Join(columns, ", "),
-				strings.Join(placeholders, ", "),
-			),
 			selectOneSQL: fmt.Sprintf(
 				"SELECT %s FROM %s WHERE id = $1",
 				strings.Join(allColumns, ", "),
@@ -156,13 +149,26 @@ func GetTable[T DBEntity](tableName string) *Table[T] {
 	}
 	return tableObj.(*Table[T])
 }
+func (t *Table[T]) hasExplicitPK(entity *T) bool {
+	v := reflect.ValueOf(entity).Elem().Field(t.pkField.Index)
+	return !v.IsZero()
+}
 
-// 将对象提取为insert的参数
-func (t *Table[T]) extractInsertArgs(ctx context.Context, entity *T) ([]any, error) {
+func (t *Table[T]) insertColumns(includePK bool) []*fieldMeta {
+	if !includePK {
+		return t.insertFields
+	}
+	cols := make([]*fieldMeta, 0, len(t.insertFields)+1)
+	cols = append(cols, t.pkField)
+	cols = append(cols, t.insertFields...)
+	return cols
+}
+
+func (t *Table[T]) extractArgsByFields(ctx context.Context, entity *T, fields []*fieldMeta) ([]any, error) {
 	val := reflect.ValueOf(entity).Elem()
-	args := make([]any, 0, len(t.insertFields))
+	args := make([]any, 0, len(fields))
 
-	for _, field := range t.insertFields {
+	for _, field := range fields {
 		fieldValue := val.Field(field.Index)
 		value, err := getValue(fieldValue)
 		if err != nil {
@@ -172,6 +178,27 @@ func (t *Table[T]) extractInsertArgs(ctx context.Context, entity *T) ([]any, err
 		args = append(args, value)
 	}
 	return args, nil
+}
+
+func buildValuesSQL(rowCount, colCount int) string {
+	rows := make([]string, rowCount)
+	for i := 0; i < rowCount; i++ {
+		ph := make([]string, colCount)
+		base := i * colCount
+		for j := 0; j < colCount; j++ {
+			ph[j] = fmt.Sprintf("$%d", base+j+1)
+		}
+		rows[i] = "(" + strings.Join(ph, ", ") + ")"
+	}
+	return strings.Join(rows, ", ")
+}
+
+func columnSQL(fields []*fieldMeta) string {
+	cols := make([]string, len(fields))
+	for i, f := range fields {
+		cols[i] = f.DBName
+	}
+	return strings.Join(cols, ", ")
 }
 
 // ---- 构建 scan 目标和后处理 ----

@@ -19,20 +19,28 @@ func (t *Table[T]) ID(ctx context.Context) (id int64, err error) {
 	return
 }
 
-// ---- InsertOne ----
-
 func (t *Table[T]) InsertOne(ctx context.Context, entity *T) error {
 	pool, err := PoolManager.Get(ctx)
 	if err != nil {
 		return err
 	}
 
-	args, err := t.extractInsertArgs(ctx, entity)
+	includePK := t.hasExplicitPK(entity)
+	fields := t.insertColumns(includePK)
+
+	args, err := t.extractArgsByFields(ctx, entity, fields)
 	if err != nil {
 		return err
 	}
 
-	row := pool.QueryRow(ctx, t.insertOneSQL, args...)
+	query := fmt.Sprintf(
+		"INSERT INTO %s (%s) VALUES %s RETURNING id",
+		t.name,
+		columnSQL(fields),
+		buildValuesSQL(1, len(fields)),
+	)
+
+	row := pool.QueryRow(ctx, query, args...)
 	var returnedID int64
 	if err := row.Scan(&returnedID); err != nil {
 		slog.ErrorContext(ctx, "InsertOne error", "err", err)
@@ -42,44 +50,60 @@ func (t *Table[T]) InsertOne(ctx context.Context, entity *T) error {
 	reflect.ValueOf(entity).Elem().Field(t.pkField.Index).SetInt(returnedID)
 	return nil
 }
-
-// ---- InsertMany ----
-
 func (t *Table[T]) InsertMany(ctx context.Context, entities []*T) error {
 	if len(entities) == 0 {
 		return nil
 	}
 
+	var withPK []*T
+	var withoutPK []*T
+
+	for _, e := range entities {
+		if t.hasExplicitPK(e) {
+			withPK = append(withPK, e)
+		} else {
+			withoutPK = append(withoutPK, e)
+		}
+	}
+
+	if len(withoutPK) > 0 {
+		if err := t.insertManyBatch(ctx, withoutPK, false); err != nil {
+			return err
+		}
+	}
+
+	if len(withPK) > 0 {
+		if err := t.insertManyBatch(ctx, withPK, true); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *Table[T]) insertManyBatch(ctx context.Context, entities []*T, includePK bool) error {
 	pool, err := PoolManager.Get(ctx)
 	if err != nil {
 		return err
 	}
 
-	colCount := len(t.insertFields)
-	allArgs := make([]any, 0, colCount*len(entities))
-	valueGroups := make([]string, 0, len(entities))
+	fields := t.insertColumns(includePK)
+	colCount := len(fields)
 
-	for rowIdx, entity := range entities {
-		args, err := t.extractInsertArgs(ctx, entity)
+	allArgs := make([]any, 0, colCount*len(entities))
+	for _, entity := range entities {
+		args, err := t.extractArgsByFields(ctx, entity, fields)
 		if err != nil {
 			return err
 		}
 		allArgs = append(allArgs, args...)
-
-		// 构建 ($1, $2, $3), ($4, $5, $6), ...
-		placeholders := make([]string, colCount)
-		base := rowIdx * colCount
-		for j := 0; j < colCount; j++ {
-			placeholders[j] = fmt.Sprintf("$%d", base+j+1)
-		}
-		valueGroups = append(valueGroups, "("+strings.Join(placeholders, ", ")+")")
 	}
 
 	query := fmt.Sprintf(
 		"INSERT INTO %s (%s) VALUES %s RETURNING id",
 		t.name,
-		t.insertColumnSQL(),
-		strings.Join(valueGroups, ", "),
+		columnSQL(fields),
+		buildValuesSQL(len(entities), colCount),
 	)
 
 	rows, err := pool.Query(ctx, query, allArgs...)
