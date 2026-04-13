@@ -34,7 +34,7 @@ func (t *Table[T]) InsertOne(ctx context.Context, entity *T) error {
 	}
 
 	query := fmt.Sprintf(
-		"INSERT INTO %s (%s) VALUES %s RETURNING id",
+		"INSERT INTO \"%s\" (%s) VALUES %s RETURNING id",
 		t.name,
 		columnSQL(fields),
 		buildValuesSQL(1, len(fields)),
@@ -161,7 +161,7 @@ func (t *Table[T]) FindOne(ctx context.Context, wb *WhereBuilder) (*T, error) {
 		return nil, err
 	}
 
-	query := fmt.Sprintf("SELECT %s FROM %s", t.allColumnSQL(), t.name)
+	query := fmt.Sprintf(`SELECT %s FROM "%s"`, t.allColumnSQL(), t.name)
 
 	whereClause, whereArgs := wb.buildSQL(1)
 	query = query + whereClause + " LIMIT 1"
