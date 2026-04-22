@@ -137,7 +137,7 @@ func GetTable[T DBEntity](tableName string) *Table[T] {
 			insertFields: insertFields,
 			pkField:      pkField,
 			selectOneSQL: fmt.Sprintf(
-				"SELECT %s FROM %s WHERE id = $1",
+				`SELECT %s FROM "%s" WHERE id = $1`,
 				strings.Join(allColumns, ", "),
 				tableName,
 			),
