@@ -41,7 +41,13 @@ func (r ErrorCode) SetData(data any) ErrorCode {
 	return r
 }
 
+var codeMap = map[string]ErrorCode{}
+
 func New(model, code, msg string) ErrorCode {
+	key := model + ":" + code
+	if _, ok := codeMap[key]; ok {
+		panic("code already exists")
+	}
 	return ErrorCode{
 		Model: model,
 		Code:  code,

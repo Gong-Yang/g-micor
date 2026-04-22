@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Gong-Yang/g-micor/syncx"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/protobuf/proto"
 )
@@ -76,10 +77,11 @@ func (m *Mq[T]) Listen(group string, handler func(ctx context.Context, msg T) er
 		panic("消费者组已存在:" + group)
 	}
 	m.groups[group] = true
-	go func() { //TODO go safe
-		m.wg.Wait() // 等待初始化完成
 
-		err := Client.XGroupCreateMkStream(context.Background(), m.Stream, group, "$").Err()
+	ctx := context.Background()
+	syncx.GOSafe(ctx, func() {
+		m.wg.Wait() // 等待初始化完成
+		err := Client.XGroupCreateMkStream(ctx, m.Stream, group, "$").Err()
 		//"$" 表示从最新的消息开始消费
 		//消费者组只会接收到创建之后新加入 stream 的消息
 		//不会处理创建之前已存在的历史消息
@@ -99,7 +101,6 @@ func (m *Mq[T]) Listen(group string, handler func(ctx context.Context, msg T) er
 		}
 		slog.Info("消费者组初始化成功", "stream", m.Stream, "group", group)
 
-		ctx := context.Background()
 		for {
 			// 检查是否需要停止
 			select {
@@ -166,5 +167,5 @@ func (m *Mq[T]) Listen(group string, handler func(ctx context.Context, msg T) er
 				}
 			}
 		}
-	}()
+	})
 }
