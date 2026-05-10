@@ -60,3 +60,24 @@ func MapWithIndex[T any, R any](source []T, converter func(int, T) R) []R {
 	}
 	return result
 }
+
+// ToMap 将数组转换为map
+// 参数:
+//   - source: 原始数组
+//   - keyFunc: 键生成函数，接收数组元素，返回map的键
+//   - valueFunc: 值生成函数，接收数组元素，返回map的值
+//
+// 返回:
+//   - 转换后的map
+func ToMap[T any, K comparable](source []T, keyFunc func(T) K) map[K]T {
+	if source == nil {
+		return make(map[K]T)
+	}
+
+	result := make(map[K]T, len(source))
+	for _, item := range source {
+		key := keyFunc(item)
+		result[key] = item
+	}
+	return result
+}
