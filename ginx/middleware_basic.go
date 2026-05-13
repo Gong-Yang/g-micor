@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"runtime"
 	"time"
@@ -154,23 +155,37 @@ func handlerConvert(in []HandlerFunc) (res []gin.HandlerFunc) {
 	return
 }
 
-//func handAuth(ctx *gin.Context, conf *RouterConf) (AuthUser, error) {
-//	if conf.author == nil { // 无认证者
-//		return nil, nil
-//	}
-//
-//	user, err := conf.author.Auth(conf.appId, ctx)
-//	if err != nil {
-//		if conf.needLogin {
-//			return nil, err // 需要登录
+//	func handAuth(ctx *gin.Context, conf *RouterConf) (AuthUser, error) {
+//		if conf.author == nil { // 无认证者
+//			return nil, nil
 //		}
-//		return nil, nil
-//	}
 //
-//	if conf.role != "" && user.GetRole() != conf.role {
-//		return nil, ErrAuthFail
-//	}
+//		user, err := conf.author.Auth(conf.appId, ctx)
+//		if err != nil {
+//			if conf.needLogin {
+//				return nil, err // 需要登录
+//			}
+//			return nil, nil
+//		}
 //
-//	GinCtxSet(ctx, ContextAuthUser, user)
-//	return user, nil
-//}
+//		if conf.role != "" && user.GetRole() != conf.role {
+//			return nil, ErrAuthFail
+//		}
+//
+//		GinCtxSet(ctx, ContextAuthUser, user)
+//		return user, nil
+//	}
+func Localhost(c *gin.Context) error {
+	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+	if err != nil {
+		c.AbortWithStatus(http.StatusForbidden)
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || (!ip.IsLoopback()) {
+		c.AbortWithStatus(http.StatusForbidden)
+		return nil
+	}
+	c.Next()
+	return nil
+}
