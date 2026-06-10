@@ -20,11 +20,27 @@ func Where(condition string, args ...any) *WhereBuilder {
 	return wb.And(condition, args...)
 }
 
+func WhereIf(ok bool, condition string, args ...any) *WhereBuilder {
+	wb := &WhereBuilder{}
+	if !ok {
+		return wb
+	}
+	return wb.And(condition, args...)
+}
+
 func OrderBy(condition string) *WhereBuilder {
 	wb := &WhereBuilder{}
 	return wb.OrderBy(condition)
 }
 func (wb *WhereBuilder) And(condition string, args ...any) *WhereBuilder {
+	wb.conditions = append(wb.conditions, condition)
+	wb.args = append(wb.args, args...)
+	return wb
+}
+func (wb *WhereBuilder) AndIf(ok bool, condition string, args ...any) *WhereBuilder {
+	if !ok {
+		return wb
+	}
 	wb.conditions = append(wb.conditions, condition)
 	wb.args = append(wb.args, args...)
 	return wb
