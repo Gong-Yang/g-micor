@@ -3,11 +3,12 @@ package app
 var Conf *Config
 
 type Config struct {
-	App     AppConfig
-	Mongo   MongoConfig
-	PGSQL   PGSQLConfig `yaml:"pgSQL"`
-	Redis   RedisConfig
-	Observe OpenObserveConfig
+	App    AppConfig
+	Mongo  MongoConfig
+	PGSQL  PGSQLConfig `yaml:"pgSQL"`
+	Redis  RedisConfig
+	AliSLS AliSLSConfig `yaml:"aliSLS"`
+	//Observe OpenObserveConfig
 }
 
 type AppConfig struct {
@@ -32,10 +33,19 @@ type MongoConfig struct {
 	Uri      string
 	Database string
 }
-type OpenObserveConfig struct {
-	Endpoint     string
-	Organization string
-	Stream       string
-	Username     string
-	Password     string
+
+type AliSLSConfig struct {
+	Endpoint        string
+	Project         string
+	Logstore        string
+	AccessKeyID     string `yaml:"accessKeyID"`
+	AccessKeySecret string `yaml:"accessKeySecret"`
 }
+
+//type OpenObserveConfig struct {
+//	Endpoint     string
+//	Organization string
+//	Stream       string
+//	Username     string
+//	Password     string
+//}
