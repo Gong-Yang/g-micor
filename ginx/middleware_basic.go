@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"runtime"
 	"time"
 
 	"github.com/Gong-Yang/g-micor/errorx"
@@ -70,24 +69,24 @@ func wrapError(c *gin.Context, a any, isPanic bool) {
 	ctx := c.Request.Context()
 	appErr, ok := a.(errorx.ErrorCode)
 	if !ok {
-		stackTrace := getStackTrace()
 		if isPanic {
-			// 记录堆栈信息
+			// panic：出错帧仍在栈上，采集清洗后的堆栈最有价值。
+			// skip=2 跳过 CleanStack 调用链上的 wrapError、handlePanic 这两层。
 			slog.ErrorContext(ctx, "panic",
 				"err", a,
-				"stack", stackTrace,
+				"stack", logx.CleanStack(2),
 				"path", c.Request.URL.Path)
 			appErr = errorx.ErrorCode{Code: errorx.RespErr, Msg: "请联系管理员"}
 			c.AbortWithStatusJSON(http.StatusInternalServerError, appErr)
-			//c.AbortWithStatus(http.StatusInternalServerError)
 			return
-		} else {
-			slog.WarnContext(ctx, "sysError",
-				"err", a,
-				"stack", stackTrace,
-				"path", c.Request.URL.Path)
-			appErr = errorx.ErrorCode{Code: errorx.RespErr, Msg: "请联系管理员"}
 		}
+		// sysError：业务函数已 return，栈早已展开，此处抓堆栈只能拿到无意义的
+		// 返回路径。未知错误本质是 bug，靠 err message + path + TraceID 即可定位，
+		// 对外统一转成系统异常 F000，不再额外采集位置信息。
+		slog.WarnContext(ctx, "sysError",
+			"err", a,
+			"path", c.Request.URL.Path)
+		appErr = errorx.ErrorCode{Code: errorx.RespErr, Msg: "请联系管理员"}
 	}
 
 	// 业务错误
@@ -96,13 +95,6 @@ func wrapError(c *gin.Context, a any, isPanic bool) {
 		"response", appErr,
 		"path", c.Request.URL.Path)
 	c.AbortWithStatusJSON(http.StatusOK, appErr)
-}
-
-// getStackTrace 获取堆栈跟踪信息
-func getStackTrace() string {
-	buf := make([]byte, 2048)
-	n := runtime.Stack(buf, false)
-	return string(buf[512:n])
 }
 
 var timeOutMap = map[int]HandlerFunc{}

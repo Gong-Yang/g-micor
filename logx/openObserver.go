@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -68,11 +70,7 @@ func (h *OpenObserveHandler) Handle(ctx context.Context, record slog.Record) err
 		fs := runtime.CallersFrames([]uintptr{record.PC})
 		f, _ := fs.Next()
 		if f.File != "" {
-			logEntry["source"] = map[string]interface{}{
-				"function": f.Function,
-				"file":     f.File,
-				"line":     f.Line,
-			}
+			logEntry["source"] = shortSource(f.Function, f.File, f.Line)
 		}
 	}
 
@@ -259,4 +257,35 @@ func (h *OpenObserveHandler) WithGroup(name string) slog.Handler {
 	//h2 := *h
 	//h2.groups = append(h.groups[:], name)
 	//return &h2
+}
+
+// shortSource 从 function 和 file 信息中提取简短的源码位置。
+// function 形如 "github.com/Gong-Yang/GGYYNet/module/artScore/service.ScoreDetail"
+// （方法则为 "...service.(*Server).Method" 或 "...service.Type.Method"），
+// file 为编译时的绝对路径，输出形如 "Gong-Yang/GGYYNet/module/artScore/service/score.go:158"。
+func shortSource(function, file string, line int) string {
+	base := filepath.Base(file)
+
+	// 取包导入路径：最后一个 "/" 之后是 "pkg.Func"，包名结束于第一个 "."
+	pkgPath := function
+	if slash := strings.LastIndex(function, "/"); slash >= 0 {
+		if dot := strings.Index(function[slash:], "."); dot >= 0 {
+			pkgPath = function[:slash+dot]
+		}
+	} else if dot := strings.Index(function, "."); dot >= 0 {
+		// 无 "/"，如标准库 "log/slog" 之外的单段包；保险处理
+		pkgPath = function[:dot]
+	}
+
+	// 去掉首段 host 域名（含 "." 的那段，如 github.com），其余保留以区分包
+	if slash := strings.Index(pkgPath, "/"); slash >= 0 {
+		if strings.Contains(pkgPath[:slash], ".") {
+			pkgPath = pkgPath[slash+1:]
+		}
+	}
+
+	if pkgPath == "" {
+		return fmt.Sprintf("%s:%d", base, line)
+	}
+	return fmt.Sprintf("%s/%s:%d", pkgPath, base, line)
 }

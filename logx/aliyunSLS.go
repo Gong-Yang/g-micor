@@ -153,9 +153,7 @@ func (h *AliyunSLSHandler) Handle(ctx context.Context, record slog.Record) error
 		fs := runtime.CallersFrames([]uintptr{record.PC})
 		f, _ := fs.Next()
 		if f.File != "" {
-			contents["source.function"] = f.Function
-			contents["source.file"] = f.File
-			contents["source.line"] = strconv.Itoa(f.Line)
+			contents["source"] = shortSource(f.Function, f.File, f.Line)
 		}
 	}
 
