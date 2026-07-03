@@ -101,7 +101,7 @@ func (t *Table[T]) insertManyBatch(ctx context.Context, entities []*T, includePK
 
 	query := fmt.Sprintf(
 		"INSERT INTO %s (%s) VALUES %s RETURNING id",
-		t.name,
+		t.qName(),
 		columnSQL(fields),
 		buildValuesSQL(len(entities), colCount),
 	)
@@ -188,7 +188,7 @@ func (t *Table[T]) Find(ctx context.Context, wb *WhereBuilder) ([]*T, error) {
 		return nil, err
 	}
 
-	query := fmt.Sprintf("SELECT %s FROM %s", t.allColumnSQL(), t.name)
+	query := fmt.Sprintf("SELECT %s FROM %s", t.allColumnSQL(), t.qName())
 
 	whereClause, whereArgs := wb.buildSQL(1)
 	query += whereClause
@@ -212,7 +212,7 @@ func (t *Table[T]) Count(ctx context.Context, wb *WhereBuilder) (int64, error) {
 		args:       wb.args,
 	}
 	// 1. COUNT 查询
-	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM %s", t.name)
+	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM %s", t.qName())
 	whereClause, whereArgs := newWb.buildSQL(1)
 	countSQL += whereClause
 
@@ -255,7 +255,7 @@ func (t *Table[T]) FindPage(ctx context.Context, wb *WhereBuilder, page, pageSiz
 
 	// 2. 数据查询：在 WHERE 子句基础上追加分页
 	// 先用不带 LIMIT/OFFSET 的 whereBuilder 构建条件
-	dataSQL := fmt.Sprintf("SELECT %s FROM %s", t.allColumnSQL(), t.name)
+	dataSQL := fmt.Sprintf("SELECT %s FROM %s", t.allColumnSQL(), t.qName())
 
 	// 复制 wb 并追加排序+分页
 	dataWb := &WhereBuilder{
@@ -323,7 +323,7 @@ func (t *Table[T]) UpdateByID(ctx context.Context, entity *T) error {
 	args = append(args, id)
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s WHERE id = $%d",
-		t.name,
+		t.qName(),
 		strings.Join(setClauses, ", "),
 		len(t.insertFields)+1,
 	)
@@ -362,7 +362,7 @@ func (t *Table[T]) Update(ctx context.Context, ub *UpdateBuilder, wb *WhereBuild
 	// WHERE 子句紧接着 SET 的编号
 	whereClause, whereArgs := wb.buildSQL(nextIdx)
 
-	query := fmt.Sprintf("UPDATE %s %s%s", t.name, setClause, whereClause)
+	query := fmt.Sprintf("UPDATE %s %s%s", t.qName(), setClause, whereClause)
 
 	// 合并参数
 	allArgs := make([]any, 0, len(setArgs)+len(whereArgs))

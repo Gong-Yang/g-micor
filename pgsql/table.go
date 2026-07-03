@@ -323,6 +323,15 @@ func (t *Table[T]) finalizeScan(val reflect.Value, sc *scanContext) error {
 	return nil
 }
 
+// ---- 表名标识符（复用） ----
+
+// qName 返回带双引号的表名，用于标识符位置的 SQL 拼接。
+// PostgreSQL 中如 user 等保留字作表名时必须加引号，否则会触发语法错误。
+// 由于所有表名均为小写，加引号与 PostgreSQL 的大小写折叠结果一致，是安全的。
+func (t *Table[T]) qName() string {
+	return `"` + t.name + `"`
+}
+
 // ---- 列名拼接（复用） ----
 
 func (t *Table[T]) allColumnSQL() string {
