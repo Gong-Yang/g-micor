@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Gong-Yang/g-micor/errorx"
@@ -20,6 +21,10 @@ func BasicMiddleware(ctx *gin.Context) {
 	traceID := random.ShortUUID()
 	ctx.Set(ContextTraceID, traceID)
 	logx.RequestAddAttrs(ctx, ContextTraceID, traceID)
+	// 请求进入时解析真实客户端 IP，写入上下文供下游（业务/限流）统一使用
+	clientIP := resolveClientIP(ctx)
+	GinCtxSet(ctx, ContextClientIP, clientIP)
+	logx.RequestAddAttrs(ctx, "clientIP", clientIP)
 	// 添加panic恢复处理
 	defer handlePanic(ctx)
 	slog.InfoContext(ctx, "request start",
@@ -180,4 +185,25 @@ func Localhost(c *gin.Context) error {
 	}
 	c.Next()
 	return nil
+}
+
+// resolveClientIP 解析真实客户端 IP，来源优先级：
+//  1. X-Real-IP：边缘 nginx 用 $remote_addr 覆盖写入，客户端无法伪造，最可信；
+//  2. X-Forwarded-For 最后一段：由最靠近服务端的可信代理追加；
+//  3. RemoteAddr：本地直连 / 无代理场景兜底。
+func resolveClientIP(c *gin.Context) string {
+	if ip := strings.TrimSpace(c.GetHeader("X-Real-IP")); ip != "" {
+		return ip
+	}
+	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		if last := strings.TrimSpace(parts[len(parts)-1]); last != "" {
+			return last
+		}
+	}
+	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+	if err != nil {
+		return strings.TrimSpace(c.Request.RemoteAddr)
+	}
+	return host
 }

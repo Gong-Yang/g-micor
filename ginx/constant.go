@@ -9,9 +9,10 @@ import (
 
 // 错误
 var (
-	ErrIsNotFunc = errors.New("not func")          // handler方法非法
-	ErrDataType  = errors.New("invalid data type") // 参数类型非法
-	ErrAuthFail  = errorx.New("system", "E001", "no auth")
+	ErrIsNotFunc       = errors.New("not func")          // handler方法非法
+	ErrDataType        = errors.New("invalid data type") // 参数类型非法
+	ErrAuthFail        = errorx.New("system", "E001", "no auth")
+	ErrTooManyRequests = errorx.New("system", "W001", "操作过于频繁，请稍后再试") // IP 限流触发
 )
 
 // 上下文常量
@@ -19,6 +20,7 @@ var (
 	ContextTraceID    = "TraceID"
 	ContextFuncResult = "FuncResult"
 	ContextAuthUser   = "AuthUser"
+	ContextClientIP   = "ClientIP" // 请求进入时写入的真实客户端 IP
 )
 
 // 参数类型
