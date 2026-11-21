@@ -3,16 +3,15 @@ package redisx
 import (
 	"context"
 	"time"
-
-	"google.golang.org/protobuf/proto"
 )
 
-type Cacher[T proto.Message, K CacherKey] struct {
+// Cacher 基于 JSON 序列化的 Redis 缓存器
+type Cacher[T any, K CacherKey] struct {
 	expire time.Duration
 	prefix string
 }
 
-func NewCacher[T proto.Message, K CacherKey](prefix string, expire time.Duration) *Cacher[T, K] {
+func NewCacher[T any, K CacherKey](prefix string, expire time.Duration) *Cacher[T, K] {
 	return &Cacher[T, K]{
 		expire: expire,
 		prefix: prefix,
@@ -26,20 +25,25 @@ type CacherKey interface {
 func (c *Cacher[T, K]) Get(ctx context.Context, key K) (T, error) {
 	result := getEntity[T]()
 	cacheKey := c.prefix + ":" + key.GenKey()
-	err := GetProto(ctx, cacheKey, result)
+	err := GetJSON(ctx, cacheKey, &result)
 	return result, err
 }
 
 func (c *Cacher[T, K]) Set(ctx context.Context, key K, value T) error {
 	cacheKey := c.prefix + ":" + key.GenKey()
-	return SetPorto(ctx, cacheKey, value, c.expire)
+	return SetJSON(ctx, cacheKey, value, c.expire)
+}
+
+// Delete 删除缓存，key 不存在时不报错
+func (c *Cacher[T, K]) Delete(ctx context.Context, key K) error {
+	return Client.Del(ctx, c.prefix+":"+key.GenKey()).Err()
 }
 
 // GetAndDelete 从Redis获取并反序列化JSON对象
 func (c *Cacher[T, K]) GetAndDelete(ctx context.Context, key K) (T, error) {
 	result := getEntity[T]()
 	cacheKey := c.prefix + ":" + key.GenKey()
-	err := GetProto(ctx, cacheKey, result)
+	err := GetJSON(ctx, cacheKey, &result)
 	if err == nil {
 		Client.Del(ctx, cacheKey)
 	}
@@ -53,13 +57,11 @@ func (c *Cacher[T, K]) GetWithFallback(ctx context.Context, key K, fallback func
 	if err == nil {
 		return result, nil
 	}
-
 	// 缓存未命中，调用回源函数
 	result, err = fallback()
 	if err != nil {
 		return result, err
 	}
-
 	// 将结果存入缓存
 	_ = c.Set(ctx, key, result)
 	return result, nil

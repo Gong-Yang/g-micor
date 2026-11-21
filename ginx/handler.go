@@ -2,25 +2,26 @@ package ginx
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"runtime"
 
 	"github.com/gin-gonic/gin"
 )
 
 func POST(group gin.IRouter, mid []HandlerFunc, path string, fun any, params ...Param) {
-	checkFun(fun)
+	checkFun(fun, params)
 	var handler = getHandler(fun, params)
 	group.POST(path, append(handlerConvert(mid), handler)...)
 }
 func GET(group gin.IRouter, mid []HandlerFunc, path string, fun any, params ...Param) {
-	checkFun(fun)
+	checkFun(fun, params)
 	var handler = getHandler(fun, params)
 	group.GET(path, append(handlerConvert(mid), handler)...)
 }
 
 func Any(group gin.IRouter, mid []HandlerFunc, path string, fun any, params ...Param) {
-	// 检查 fun 是否是可调用的
-	checkFun(fun)
+	checkFun(fun, params)
 	var handler = getHandler(fun, params)
 	group.Any(path, append(handlerConvert(mid), handler)...)
 }
@@ -37,7 +38,6 @@ func process(ctx context.Context, ginCtx *gin.Context, fun any, params []Param) 
 		arg, err := param.GetParam(ginCtx)
 		if err != nil {
 			panic(err)
-			return
 		}
 		args[i+1] = reflect.ValueOf(arg)
 	}
@@ -51,12 +51,42 @@ func process(ctx context.Context, ginCtx *gin.Context, fun any, params []Param) 
 	return
 }
 
-func checkFun(fun any) {
-	// 检查 fun 是否是可调用的
+var (
+	ctxType = reflect.TypeOf((*context.Context)(nil)).Elem()
+	errType = reflect.TypeOf((*error)(nil)).Elem()
+)
+
+// typedParam 能声明自身取值类型的参数，用于注册时校验签名
+type typedParam interface {
+	paramType() reflect.Type
+}
+
+// checkFun 注册路由时校验处理函数签名：
+// func(ctx context.Context, 参数1, 参数2...) (结果, error)，参数顺序和类型与 params 一致。
+func checkFun(fun any, params []Param) {
 	funValue := reflect.ValueOf(fun)
 	if funValue.Kind() != reflect.Func {
 		panic(ErrIsNotFunc)
-		return
+	}
+	t := funValue.Type()
+	name := runtime.FuncForPC(funValue.Pointer()).Name()
+	if t.NumIn() != len(params)+1 {
+		panic(fmt.Sprintf("ginx: %s 应有 %d 个参数（ctx + %d 个路由参数），实际 %d 个", name, len(params)+1, len(params), t.NumIn()))
+	}
+	if t.In(0) != ctxType {
+		panic(fmt.Sprintf("ginx: %s 第 1 个参数必须是 context.Context", name))
+	}
+	for i, p := range params {
+		tp, ok := p.(typedParam)
+		if !ok || tp.paramType() == nil {
+			continue
+		}
+		if !tp.paramType().AssignableTo(t.In(i + 1)) {
+			panic(fmt.Sprintf("ginx: %s 第 %d 个参数应为 %s，实际为 %s", name, i+2, tp.paramType(), t.In(i+1)))
+		}
+	}
+	if t.NumOut() != 2 || t.Out(1) != errType {
+		panic(fmt.Sprintf("ginx: %s 返回值必须是 (结果, error)", name))
 	}
 }
 

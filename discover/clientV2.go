@@ -3,11 +3,13 @@ package discover
 import (
 	"context"
 	"fmt"
+	"log"
+	"log/slog"
+	"sync"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/resolver"
-	"log"
-	"log/slog"
 )
 
 // Grpc 发现服务地址
@@ -36,7 +38,9 @@ func (c ClientService) Ping(ctx context.Context, req *PingReq) (*PingRes, error)
 func (c ClientService) SubscribeServerRegister(ctx context.Context, req *NotifyReq) (*NotifyRes, error) {
 	slog.Info("SubscribeServerRegister", "info", req)
 	// 触发重新解析
+	resolverMu.RLock()
 	r, ok := resolverMap[req.Server]
+	resolverMu.RUnlock()
 	if !ok {
 		slog.Error("server not find", "server", req.Server)
 		return nil, nil
@@ -48,7 +52,10 @@ func init() {
 	resolver.Register(&resolverBuilder{})
 }
 
-var resolverMap = make(map[string]*resolve)
+var (
+	resolverMu  sync.RWMutex // 多个服务的连接可能同时建立
+	resolverMap = make(map[string]*resolve)
+)
 var localPort = ""
 
 var centerClient RegisterClient
@@ -111,7 +118,9 @@ func (r *resolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, 
 		target: target,
 		cc:     cc,
 	}
+	resolverMu.Lock()
 	resolverMap[target.Endpoint()] = r2
+	resolverMu.Unlock()
 	r2.updateStates()
 	return r2, nil
 }

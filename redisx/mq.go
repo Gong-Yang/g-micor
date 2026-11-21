@@ -2,6 +2,7 @@ package redisx
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"sync"
@@ -9,12 +10,11 @@ import (
 
 	"github.com/Gong-Yang/g-micor/syncx"
 	"github.com/redis/go-redis/v9"
-	"google.golang.org/protobuf/proto"
 )
 
 var ConsumerName string
 
-func NewMq[T proto.Message](stream string, maxLen int64) *Mq[T] {
+func NewMq[T any](stream string, maxLen int64) *Mq[T] {
 	m := &Mq[T]{
 		Stream: stream,
 		MaxLen: maxLen,
@@ -27,7 +27,7 @@ func NewMq[T proto.Message](stream string, maxLen int64) *Mq[T] {
 	return m
 }
 
-type Mq[T proto.Message] struct {
+type Mq[T any] struct {
 	Stream string
 	MaxLen int64
 	wg     *sync.WaitGroup
@@ -46,7 +46,7 @@ func (m *Mq[T]) Stop() {
 
 // Publish  发布消息
 func (m *Mq[T]) Publish(msg T) error {
-	data, err := proto.Marshal(msg)
+	data, err := json.Marshal(msg)
 	if err != nil {
 		slog.Error("消息序列化失败", "stream", m.Stream, "error", err)
 		return err
@@ -55,7 +55,7 @@ func (m *Mq[T]) Publish(msg T) error {
 	args := &redis.XAddArgs{
 		Stream: m.Stream,
 		Values: map[string]any{
-			"data": data,
+			"data": string(data),
 		},
 		MaxLen: m.MaxLen,
 	}
@@ -142,7 +142,7 @@ func (m *Mq[T]) Listen(group string, handler func(ctx context.Context, msg T) er
 						continue
 					}
 					bytes := []byte(str)
-					err := proto.Unmarshal(bytes, entity)
+					err := json.Unmarshal(bytes, &entity)
 					//converted, err := jsonx.Convert[T](msg.Values)
 					if err != nil {
 						slog.ErrorContext(msgctx, "消息转换失败", "stream", m.Stream, "group", group, "error", err, "values", msg.Values)

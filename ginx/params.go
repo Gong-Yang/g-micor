@@ -1,6 +1,8 @@
 package ginx
 
 import (
+	"mime/multipart"
+	"reflect"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -101,4 +103,32 @@ func strConvert(value string, Type string) (res any, err error) {
 	}
 	err = ErrDataType
 	return
+}
+
+// 以下方法声明各参数的取值类型，供注册路由时校验处理函数签名
+
+func (f *FormFileParam) paramType() reflect.Type {
+	return reflect.TypeOf((*multipart.FileHeader)(nil))
+}
+
+func (b *BodyParam[T]) paramType() reflect.Type { return reflect.TypeOf((*T)(nil)) }
+
+func (h *HeaderParam) paramType() reflect.Type { return reflect.TypeOf("") }
+
+func (b *QueryParamItem) paramType() reflect.Type { return strConvertType(b.Type) }
+
+func (b *PathParamItem) paramType() reflect.Type { return strConvertType(b.Type) }
+
+func strConvertType(Type string) reflect.Type {
+	switch Type {
+	case STRING:
+		return reflect.TypeOf("")
+	case INT:
+		return reflect.TypeOf(0)
+	case FLOAT:
+		return reflect.TypeOf(float64(0))
+	case BOOL:
+		return reflect.TypeOf(false)
+	}
+	return nil
 }

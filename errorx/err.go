@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type ErrorCode struct {
@@ -32,7 +33,7 @@ func (r ErrorCode) Is(target error) bool {
 
 func (r ErrorCode) MsgParams(args ...string) ErrorCode {
 	for i, arg := range args {
-		strings.ReplaceAll(r.Msg, "{"+strconv.Itoa(i)+"}", arg)
+		r.Msg = strings.ReplaceAll(r.Msg, "{"+strconv.Itoa(i)+"}", arg)
 	}
 	return r
 }
@@ -41,16 +42,24 @@ func (r ErrorCode) SetData(data any) ErrorCode {
 	return r
 }
 
-var codeMap = map[string]ErrorCode{}
+var (
+	codeMu  sync.Mutex
+	codeMap = map[string]ErrorCode{}
+)
 
+// New 定义错误码，应在包级变量中声明。同一 model 下 code 重复会 panic。
 func New(model, code, msg string) ErrorCode {
 	key := model + ":" + code
-	if _, ok := codeMap[key]; ok {
-		panic("code already exists")
-	}
-	return ErrorCode{
+	res := ErrorCode{
 		Model: model,
 		Code:  code,
 		Msg:   msg,
 	}
+	codeMu.Lock()
+	defer codeMu.Unlock()
+	if _, ok := codeMap[key]; ok {
+		panic("errorx: 错误码重复定义 " + key)
+	}
+	codeMap[key] = res
+	return res
 }

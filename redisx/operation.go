@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"strconv"
 	"time"
-
-	"google.golang.org/protobuf/proto"
 )
 
 // convertSimpleValue 将简单类型转换为 string
@@ -200,34 +198,6 @@ func GetJSON[T any](ctx context.Context, key string, out T) error {
 	return nil
 }
 
-// SetPorto 将 proto.Message 对象序列化为字节数组并保存到 Redis
-func SetPorto(ctx context.Context, key string, value proto.Message, expire time.Duration) error {
-	byteArr, err := proto.Marshal(value)
-	if err != nil {
-		slog.ErrorContext(ctx, "SetProto marshal error", "err", err, "key", key)
-		return err
-	}
-
-	err = Client.Set(ctx, key, byteArr, expire).Err()
-	if err != nil {
-		slog.ErrorContext(ctx, "SetProto redis set error", "err", err, "key", key)
-		return err
-	}
-	return nil
-}
-
-// GetProto 泛型方法：从 Redis 获取并反序列化 proto.Message
-func GetProto[T proto.Message](ctx context.Context, key string, out T) error {
-	data, err := Client.Get(ctx, key).Bytes()
-	if err != nil {
-		return err
-	}
-	if err := proto.Unmarshal(data, out); err != nil {
-		return err
-	}
-	return nil
-}
-
 // SetNXSimple 存储简单对象（string、int/uint、float、bool），仅当 key 不存在时
 func SetNXSimple[T comparable](ctx context.Context, key string, value T, expire time.Duration) (bool, error) {
 	s, err := convertSimpleValue(value)
@@ -253,22 +223,6 @@ func SetNXJSON(ctx context.Context, key string, value any, expire time.Duration)
 	result, err := Client.SetNX(ctx, key, data, expire).Result()
 	if err != nil {
 		slog.InfoContext(ctx, "SetNXJSON redis set error", "err", err)
-		return false, err
-	}
-	return result, nil
-}
-
-// SetNXProto 将 proto.Message 对象序列化为字节数组并保存到 Redis，仅当 key 不存在时
-func SetNXProto(ctx context.Context, key string, value proto.Message, expire time.Duration) (bool, error) {
-	byteArr, err := proto.Marshal(value)
-	if err != nil {
-		slog.ErrorContext(ctx, "SetNXProto marshal error", "err", err, "key", key)
-		return false, err
-	}
-
-	result, err := Client.SetNX(ctx, key, byteArr, expire).Result()
-	if err != nil {
-		slog.ErrorContext(ctx, "SetNXProto redis set error", "err", err, "key", key)
 		return false, err
 	}
 	return result, nil
